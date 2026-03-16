@@ -30,3 +30,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Other files
+PROJECT_STATUS.md
+QUICK_START.md
