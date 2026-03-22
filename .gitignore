@@ -16,7 +16,7 @@ server/dist/
 server/uploads/
 
 # CSV / seed data (optional — remove if you want to include)
-server/*.csv
+# server/*.csv
 
 # Logs
 *.log
