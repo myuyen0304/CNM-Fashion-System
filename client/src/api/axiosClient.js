@@ -9,6 +9,19 @@ const axiosClient = axios.create({
   },
 });
 
+const AUTH_PATHS_TO_SKIP_REFRESH = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/verify-email",
+  "/auth/refresh-token",
+];
+
+const shouldSkipRefresh = (requestUrl = "") => {
+  return AUTH_PATHS_TO_SKIP_REFRESH.some((path) => requestUrl.includes(path));
+};
+
 // Request interceptor: gắn token vào header
 axiosClient.interceptors.request.use(
   (config) => {
@@ -26,12 +39,17 @@ axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const refreshToken = localStorage.getItem("refreshToken");
+    const canTryRefresh =
+      error.response?.status === 401 &&
+      !originalRequest?._retry &&
+      Boolean(refreshToken) &&
+      !shouldSkipRefresh(originalRequest?.url);
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (canTryRefresh) {
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem("refreshToken");
         const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
           refreshToken,
         });
@@ -44,7 +62,12 @@ axiosClient.interceptors.response.use(
       } catch (err) {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
-        window.location.href = "/login";
+
+        // Tránh reload cứng ngay tại trang login để thông báo lỗi còn hiển thị.
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+
         return Promise.reject(err);
       }
     }
