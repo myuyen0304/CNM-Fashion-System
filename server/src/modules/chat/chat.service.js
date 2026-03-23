@@ -356,10 +356,86 @@ const transferToAdmin = async (roomId, adminId) => {
   return room;
 };
 
+const listSupportRooms = async ({ page = 1, limit = 20, status, keyword }) => {
+  return chatRepo.listRooms({ page, limit, status, keyword });
+};
+
+const getRoomMessagesForStaff = async (roomId, page = 1) => {
+  const room = await chatRepo.findRoomById(roomId);
+  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+
+  const data = await chatRepo.getMessages(roomId, page);
+  return {
+    room: {
+      _id: room._id,
+      customerId: room.customerId,
+      adminId: room.adminId,
+      status: room.status,
+      awaitingResolutionConfirm: room.awaitingResolutionConfirm,
+      resolvedAt: room.resolvedAt,
+      closedAt: room.closedAt,
+      lastMessage: room.lastMessage,
+      updatedAt: room.updatedAt,
+    },
+    ...data,
+  };
+};
+
+const sendMessageByStaff = async (staffUser, roomId, { content }) => {
+  if (!content || !content.trim()) {
+    throw new ApiError(400, "Nội dung tin nhắn không được để trống.");
+  }
+
+  const room = await chatRepo.findRoomById(roomId);
+  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+  if (room.status === "closed") {
+    throw new ApiError(400, "Phiên chat đã kết thúc.");
+  }
+
+  if (!room.adminId) {
+    await chatRepo.assignAdminToRoom(roomId, staffUser._id);
+  } else if (room.adminId.toString() !== staffUser._id.toString()) {
+    throw new ApiError(403, "Phòng chat đang được nhân viên khác phụ trách.");
+  }
+
+  const message = await chatRepo.saveMessage({
+    roomId,
+    senderId: staffUser._id,
+    senderRole: "admin",
+    content: content.trim(),
+  });
+
+  await chatRepo.updateRoomStatus(roomId, {
+    status: "active",
+    awaitingResolutionConfirm: false,
+    resolvedAt: null,
+    lastMessage: message.content,
+  });
+
+  const io = getIO();
+  emitMessage(io, roomId, message);
+
+  return message;
+};
+
+const assignRoomToStaff = async (roomId, staffUserId) => {
+  const room = await chatRepo.findRoomById(roomId);
+  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+
+  const updated = await chatRepo.assignAdminToRoom(roomId, staffUserId);
+  const io = getIO();
+  io.to(roomId).emit("adminAssigned", { adminId: staffUserId });
+  return updated;
+};
+
 module.exports = {
   getOrCreateRoom,
   sendMessage,
   adminSendMessage,
   getMessages,
   transferToAdmin,
+  listSupportRooms,
+  getRoomMessagesForStaff,
+  sendMessageByStaff,
+  assignRoomToStaff,
 };

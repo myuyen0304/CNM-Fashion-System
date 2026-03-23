@@ -1,53 +1,44 @@
-const bcrypt = require("bcryptjs");
+﻿const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const ApiError = require("../../shared/utils/ApiError");
 const authRepo = require("./auth.repository");
 
-// ========================
-// ĐĂNG KÝ
-// ========================
 const register = async ({ name, email, password }) => {
-  // 1. Kiểm tra email đã tồn tại
   const existingUser = await authRepo.findUserByEmail(email);
   if (existingUser) {
     throw new ApiError(
       409,
-      "Email đã tồn tại, vui lòng sử dụng email khác hoặc đăng nhập.",
+      "Email already exists, please use another email or login.",
     );
   }
 
-  // 2. Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // 3. Tạo user (ngay tức thì có thể sử dụng)
-  const user = await authRepo.createUser({
+  await authRepo.createUser({
     name,
     email: email.toLowerCase(),
     password: hashedPassword,
   });
 
   return {
-    message: "Đăng ký thành công. Bạn có thể đăng nhập ngay.",
+    message: "Register success. You can login now.",
   };
 };
 
-// ========================
-// ĐĂNG NHẬP
-// ========================
 const login = async ({ email, password }) => {
-  // 1. Tìm user
   const user = await authRepo.findUserByEmail(email);
   if (!user) {
-    throw new ApiError(401, "Email hoặc mật khẩu không đúng.");
+    throw new ApiError(401, "Invalid email or password.");
+  }
+  if (user.isActive === false) {
+    throw new ApiError(403, "Account is deactivated.");
   }
 
-  // 2. Check password
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new ApiError(401, "Email hoặc mật khẩu không đúng.");
+    throw new ApiError(401, "Invalid email or password.");
   }
 
-  // 3. Tạo tokens
   const accessToken = jwt.sign(
     { userId: user._id, role: user.role },
     process.env.JWT_SECRET,
@@ -71,36 +62,31 @@ const login = async ({ email, password }) => {
       email: user.email,
       role: user.role,
       avatarUrl: user.avatarUrl,
+      isActive: user.isActive,
     },
   };
 };
 
-// ========================
-// REFRESH TOKEN
-// ========================
 const refreshAccessToken = async (refreshToken) => {
   if (!refreshToken) {
-    throw new ApiError(401, "Refresh token không được cung cấp.");
+    throw new ApiError(401, "Refresh token is required.");
   }
 
-  // Verify refresh token
   let decoded;
   try {
     decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
-  } catch (err) {
-    throw new ApiError(401, "Refresh token không hợp lệ hoặc đã hết hạn.");
+  } catch (_err) {
+    throw new ApiError(401, "Refresh token is invalid or expired.");
   }
 
-  // Kiểm tra token có trong DB
   const storedToken = await authRepo.findRefreshToken(refreshToken);
   if (!storedToken) {
-    throw new ApiError(401, "Refresh token không tồn tại.");
+    throw new ApiError(401, "Refresh token does not exist.");
   }
 
-  // Tạo access token mới
   const user = await authRepo.findUserById(decoded.userId);
   if (!user) {
-    throw new ApiError(401, "Tài khoản không tồn tại.");
+    throw new ApiError(401, "Account does not exist.");
   }
 
   const accessToken = jwt.sign(
@@ -112,14 +98,11 @@ const refreshAccessToken = async (refreshToken) => {
   return { accessToken };
 };
 
-// ========================
-// ĐĂNG XUẤT
-// ========================
 const logout = async (refreshToken) => {
   if (refreshToken) {
     await authRepo.deleteRefreshToken(refreshToken);
   }
-  return { message: "Đăng xuất thành công." };
+  return { message: "Logout successful." };
 };
 
 module.exports = {

@@ -1,18 +1,17 @@
-const ApiError = require("../../shared/utils/ApiError");
+﻿const ApiError = require("../../shared/utils/ApiError");
 const {
   ORDER_STATUS,
   SHIPPING_METHODS,
   PAYMENT_METHODS,
+  RETURN_STATUS,
 } = require("../../shared/constants");
 const orderRepo = require("./order.repository");
 const cartRepo = require("../cart/cart.repository");
 const Product = require("../product/product.model");
 const productRepo = require("../product/product.repository");
 
-/**
- * UC-06: Đặt hàng
- * Flow: validate cart → check stock → calc subtotal → input shipping → input method → confirm → create order
- */
+const STAFF_ROLES = ["admin", "supervisor", "employee"];
+
 const createOrder = async (
   customerId,
   {
@@ -33,13 +32,12 @@ const createOrder = async (
         : [];
 
   if (!items || items.length === 0) {
-    throw new ApiError(400, "Giỏ hàng bị trống.");
+    throw new ApiError(400, "Cart is empty.");
   }
 
   let normalizedShippingAddress = shippingAddress;
   let normalizedShippingPhone = shippingPhone;
 
-  // Frontend hiện gửi shippingAddress dưới dạng object { fullName, phone, address, city }
   if (shippingAddress && typeof shippingAddress === "object") {
     const { fullName, phone, address, city } = shippingAddress;
     normalizedShippingPhone = shippingPhone || phone;
@@ -49,14 +47,11 @@ const createOrder = async (
   }
 
   if (!normalizedShippingAddress || !normalizedShippingPhone) {
-    throw new ApiError(
-      400,
-      "Vui lòng nhập địa chỉ và số điện thoại giao hàng.",
-    );
+    throw new ApiError(400, "Shipping address and phone are required.");
   }
 
   if (!Object.values(SHIPPING_METHODS).includes(shippingMethod)) {
-    throw new ApiError(400, "Phương thức giao hàng không hợp lệ.");
+    throw new ApiError(400, "Invalid shipping method.");
   }
 
   const paymentInput = String(paymentMethod || "vnpay").toLowerCase();
@@ -67,31 +62,27 @@ const createOrder = async (
     normalizedPaymentMethod = PAYMENT_METHODS.PAYPAL;
   }
 
-  // Kiểm tra tồn kho cho tất cả item
   for (const item of items) {
     const product = await Product.findById(item.productId);
     if (!product) {
-      throw new ApiError(404, `Sản phẩm ${item.productId} không tồn tại.`);
+      throw new ApiError(404, `Product ${item.productId} does not exist.`);
     }
     if (product.stock < item.quantity) {
       throw new ApiError(
         400,
-        `Chỉ còn ${product.stock} "${product.name}" trong kho.`,
+        `Only ${product.stock} units left for product "${product.name}".`,
       );
     }
   }
 
-  // Tính toán subtotal
   let subtotal = 0;
   items.forEach((item) => {
     subtotal += item.unitPrice * item.quantity;
   });
 
-  // Tính phí giao hàng
-  const shippingFee = shippingMethod === "express" ? 50000 : 20000; // VND
+  const shippingFee = shippingMethod === "express" ? 50000 : 20000;
   const total = subtotal + shippingFee;
 
-  // Tạo đơn hàng
   const order = await orderRepo.createOrder({
     customerId,
     items,
@@ -103,9 +94,11 @@ const createOrder = async (
     shippingFee,
     total,
     status: ORDER_STATUS.PENDING,
+    returnRequest: {
+      status: RETURN_STATUS.NONE,
+    },
   });
 
-  // Giảm stock từng sản phẩm
   for (const item of items) {
     await productRepo.decreaseStock(item.productId, item.quantity);
   }
@@ -113,41 +106,36 @@ const createOrder = async (
   return order;
 };
 
-/**
- * UC-08: Lịch sử đơn hàng
- */
 const getOrderHistory = async (customerId, page = 1) => {
   return orderRepo.findOrdersByCustomer(customerId, page);
 };
 
-/**
- * Chi tiết đơn hàng
- */
-const getOrderDetail = async (orderId, customerId) => {
+const getOrderDetail = async (orderId, actorUser) => {
   const order = await orderRepo.findOrderById(orderId);
   if (!order) {
-    throw new ApiError(404, "Không tìm thấy đơn hàng.");
+    throw new ApiError(404, "Order not found.");
   }
 
-  // Kiểm tra quyền (chỉ chủ nhân hoặc admin mới xem được)
+  if (STAFF_ROLES.includes(actorUser.role)) {
+    return order;
+  }
+
   const ownerId =
     typeof order.customerId === "object" && order.customerId._id
       ? order.customerId._id.toString()
       : order.customerId.toString();
-  if (ownerId !== customerId.toString()) {
-    throw new ApiError(403, "Bạn không có quyền xem đơn hàng này.");
+
+  if (ownerId !== actorUser._id.toString()) {
+    throw new ApiError(403, "You do not have permission to view this order.");
   }
 
   return order;
 };
 
-/**
- * Hủy đơn hàng (chỉ khi status = PENDING)
- */
 const cancelOrder = async (orderId, customerId) => {
   const order = await orderRepo.findOrderById(orderId);
   if (!order) {
-    throw new ApiError(404, "Không tìm thấy đơn hàng.");
+    throw new ApiError(404, "Order not found.");
   }
 
   const ownerId =
@@ -155,23 +143,121 @@ const cancelOrder = async (orderId, customerId) => {
       ? order.customerId._id.toString()
       : order.customerId.toString();
   if (ownerId !== customerId.toString()) {
-    throw new ApiError(403, "Bạn không có quyền hủy đơn hàng này.");
+    throw new ApiError(403, "You do not have permission to cancel this order.");
   }
 
   if (order.status !== ORDER_STATUS.PENDING) {
-    throw new ApiError(
-      400,
-      'Chỉ có thể hủy đơn hàng trong trạng thái "Chờ thanh toán".',
-    );
+    throw new ApiError(400, "Order can only be cancelled when pending payment.");
   }
 
-  // Hoàn lại stock
   for (const item of order.items) {
     await productRepo.increaseStock(item.productId, item.quantity);
   }
 
-  // Cập nhật status
   return orderRepo.updateOrderStatus(orderId, ORDER_STATUS.CANCELLED);
+};
+
+const getAllOrdersForStaff = async ({ page, limit, status, paymentMethod, from, to }) => {
+  return orderRepo.findAllOrders({
+    page,
+    limit,
+    status,
+    paymentMethod,
+    from,
+    to,
+  });
+};
+
+const updateOrderStatusByStaff = async (orderId, status) => {
+  if (!Object.values(ORDER_STATUS).includes(status)) {
+    throw new ApiError(400, "Invalid order status.");
+  }
+
+  const order = await orderRepo.findOrderById(orderId);
+  if (!order) {
+    throw new ApiError(404, "Order not found.");
+  }
+
+  if (status === ORDER_STATUS.CANCELLED && order.status !== ORDER_STATUS.CANCELLED) {
+    for (const item of order.items) {
+      await productRepo.increaseStock(item.productId, item.quantity);
+    }
+  }
+
+  return orderRepo.updateOrderStatus(orderId, status);
+};
+
+const handleReturnRequestByEmployee = async (orderId, actorUser, payload) => {
+  const order = await orderRepo.findOrderById(orderId);
+  if (!order) throw new ApiError(404, "Order not found.");
+
+  const action = String(payload.action || "").toLowerCase();
+  const reason = String(payload.reason || "").trim();
+  const note = String(payload.note || "").trim();
+
+  const validActions = ["request", "approve", "reject", "complete"];
+  if (!validActions.includes(action)) {
+    throw new ApiError(400, "Invalid return action.");
+  }
+
+  const currentReturn = order.returnRequest || { status: RETURN_STATUS.NONE };
+  let nextStatus = currentReturn.status;
+
+  if (action === "request") nextStatus = RETURN_STATUS.PENDING;
+  if (action === "approve") nextStatus = RETURN_STATUS.APPROVED;
+  if (action === "reject") nextStatus = RETURN_STATUS.REJECTED;
+  if (action === "complete") nextStatus = RETURN_STATUS.COMPLETED;
+
+  if (action === "request" && !reason) {
+    throw new ApiError(400, "Return reason is required.");
+  }
+
+  if (
+    nextStatus === RETURN_STATUS.COMPLETED &&
+    currentReturn.status !== RETURN_STATUS.COMPLETED
+  ) {
+    for (const item of order.items) {
+      await productRepo.increaseStock(item.productId, item.quantity);
+    }
+
+    if (order.status !== ORDER_STATUS.CANCELLED) {
+      await orderRepo.updateOrderStatus(orderId, ORDER_STATUS.CANCELLED);
+    }
+  }
+
+  const updated = await orderRepo.updateReturnRequest(orderId, {
+    status: nextStatus,
+    reason: reason || currentReturn.reason || "",
+    note: note || currentReturn.note || "",
+    handledBy: actorUser._id,
+    updatedAt: new Date(),
+  });
+
+  return updated;
+};
+
+const getRevenueSummary = async ({ period, from, to }) => {
+  const normalizedPeriod = ["day", "month", "year"].includes(period)
+    ? period
+    : "day";
+
+  const rows = await orderRepo.aggregateRevenue({
+    period: normalizedPeriod,
+    from,
+    to,
+  });
+
+  const totalRevenue = rows.reduce((sum, row) => sum + (row.totalRevenue || 0), 0);
+  const totalOrders = rows.reduce((sum, row) => sum + (row.orderCount || 0), 0);
+
+  return {
+    period: normalizedPeriod,
+    from: from || null,
+    to: to || null,
+    totalRevenue,
+    totalOrders,
+    rows,
+  };
 };
 
 module.exports = {
@@ -179,4 +265,8 @@ module.exports = {
   getOrderHistory,
   getOrderDetail,
   cancelOrder,
+  getAllOrdersForStaff,
+  updateOrderStatusByStaff,
+  handleReturnRequestByEmployee,
+  getRevenueSummary,
 };

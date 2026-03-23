@@ -1,13 +1,17 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
+import Card from "./ui/Card";
+import Button from "./ui/Button";
+import PriceTag from "./ui/PriceTag";
 
 export default function ProductCard({ product }) {
   const { addItem } = useCart();
   const { token } = useAuth();
   const [adding, setAdding] = useState(false);
   const isLoggedIn = Boolean(token);
+
   const availableSizes = Array.isArray(product.sizes)
     ? product.sizes
     : typeof product.size === "string"
@@ -32,7 +36,7 @@ export default function ProductCard({ product }) {
 
   return (
     <Link to={`/products/${product._id}`}>
-      <div className="card overflow-hidden">
+      <Card className="overflow-hidden">
         <div className="relative pb-[100%] bg-gray-200">
           <img
             src={product.images?.[0] || "/placeholder.jpg"}
@@ -40,8 +44,10 @@ export default function ProductCard({ product }) {
             className="absolute inset-0 w-full h-full object-cover hover:scale-110 transition-transform"
           />
         </div>
+
         <div className="p-4">
           <h3 className="font-semibold text-lg truncate">{product.name}</h3>
+
           {availableSizes.length > 0 && (
             <div className="flex items-center gap-2 mt-3 flex-wrap">
               <span className="text-xs text-gray-500">Size</span>
@@ -55,32 +61,29 @@ export default function ProductCard({ product }) {
               ))}
             </div>
           )}
+
           <div className="flex items-center justify-between mt-2">
             <span className="text-yellow-500">★ {product.avgRating}</span>
-            <span className="text-gray-500 text-sm">
-              Bán {product.soldCount}
-            </span>
+            <span className="text-gray-500 text-sm">Bán {product.soldCount}</span>
           </div>
+
           <div className="flex items-center justify-between mt-4">
-            <span className="text-2xl font-bold text-primary">
-              {product.price.toLocaleString("vi-VN")}₫
-            </span>
+            <PriceTag value={product.price} className="text-2xl" />
             {isLoggedIn ? (
-              <button
+              <Button
                 onClick={handleAddToCart}
                 disabled={adding}
-                className="btn-secondary text-sm disabled:opacity-50"
+                variant="secondary"
+                className="text-sm"
               >
                 {adding ? "..." : "Thêm"}
-              </button>
+              </Button>
             ) : (
-              <span className="text-sm font-medium text-primary">
-                Xem chi tiết
-              </span>
+              <span className="text-sm font-medium text-primary">Xem chi tiết</span>
             )}
           </div>
         </div>
-      </div>
+      </Card>
     </Link>
   );
 }
