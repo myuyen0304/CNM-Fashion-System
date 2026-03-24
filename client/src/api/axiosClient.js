@@ -22,6 +22,35 @@ const shouldSkipRefresh = (requestUrl = "") => {
   return AUTH_PATHS_TO_SKIP_REFRESH.some((path) => requestUrl.includes(path));
 };
 
+const normalizeAuthErrorMessage = (status, requestUrl = "", message = "") => {
+  const raw = String(message || "").trim();
+  const lowered = raw
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đð]/g, "d")
+    .replace(/[^a-z\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const isLoginRequest = String(requestUrl || "").includes("/auth/login");
+
+  if (
+    lowered.includes("chua dang nhap") ||
+    lowered.includes("vui long dang nhap") ||
+    lowered.includes("token khong hop le") ||
+    lowered.includes("token da het han")
+  ) {
+    return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
+  }
+
+  if (status === 401 && !isLoginRequest) {
+    return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
+  }
+
+  return raw;
+};
+
 // Request interceptor: gắn token vào header
 axiosClient.interceptors.request.use(
   (config) => {
@@ -39,6 +68,19 @@ axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const normalizedMessage = normalizeAuthErrorMessage(
+      error.response?.status,
+      originalRequest?.url,
+      error.response?.data?.message,
+    );
+
+    if (normalizedMessage && error.response) {
+      error.response.data = {
+        ...(error.response.data || {}),
+        message: normalizedMessage,
+      };
+    }
+
     const refreshToken = localStorage.getItem("refreshToken");
     const canTryRefresh =
       error.response?.status === 401 &&
