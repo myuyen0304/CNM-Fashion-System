@@ -30,7 +30,7 @@ router.get(
 router.post("/", orderController.createOrder);
 router.get("/", orderController.getOrderHistory);
 router.get("/:id", orderController.getOrderDetail);
+router.patch("/:id/cancel", orderController.cancelOrder);
 router.put("/:id/cancel", orderController.cancelOrder);
 
 module.exports = router;
-
