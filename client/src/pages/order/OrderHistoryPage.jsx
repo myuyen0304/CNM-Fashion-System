@@ -2,15 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import LoadingSpinner from "../../components/LoadingSpinner";
-
-const STATUS_LABELS = {
-  pending: "Chờ thanh toán",
-  paid: "Đã thanh toán",
-  completed: "Đã thanh toán",
-  shipping: "Đang giao",
-  delivered: "Hoàn tất",
-  cancelled: "Hủy",
-};
+import {
+  getOrderDisplayStatus,
+  normalizeOrderStatus,
+} from "../../utils/orderStatus";
 
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState([]);
@@ -56,35 +51,49 @@ export default function OrderHistoryPage() {
                 key={order._id}
                 className="card p-6 hover:shadow-lg transition"
               >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <div className="text-sm text-gray-500">Mã đơn hàng</div>
-                    <div className="font-semibold">{order._id}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Ngày đặt</div>
-                    <div className="font-semibold">
-                      {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+                {(() => {
+                  const normalizedStatus = normalizeOrderStatus(order.status);
+                  const statusColorClass =
+                    normalizedStatus === "delivered" ||
+                    normalizedStatus === "completed" ||
+                    normalizedStatus === "paid"
+                      ? "text-green-600"
+                      : normalizedStatus === "cancelled"
+                        ? "text-red-600"
+                        : "text-blue-600";
+
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <div className="text-sm text-gray-500">Mã đơn hàng</div>
+                        <div className="font-semibold">{order._id}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Ngày đặt</div>
+                        <div className="font-semibold">
+                          {new Date(order.createdAt).toLocaleDateString(
+                            "vi-VN",
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Tổng tiền</div>
+                        <div className="font-semibold text-primary">
+                          {(order.subtotal + order.shippingFee).toLocaleString(
+                            "vi-VN",
+                          )}
+                          ₫
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Trạng thái</div>
+                        <div className={`font-semibold ${statusColorClass}`}>
+                          {getOrderDisplayStatus(order.status)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Tổng tiền</div>
-                    <div className="font-semibold text-primary">
-                      {(order.subtotal + order.shippingFee).toLocaleString(
-                        "vi-VN",
-                      )}
-                      ₫
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Trạng thái</div>
-                    <div
-                      className={`font-semibold ${order.status === "delivered" || order.status === "completed" ? "text-green-600" : order.status === "cancelled" ? "text-red-600" : "text-blue-600"}`}
-                    >
-                      {STATUS_LABELS[order.status] || order.status || "N/A"}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 <div className="text-sm text-gray-600 mb-4">
                   {order.items.length} sản phẩm

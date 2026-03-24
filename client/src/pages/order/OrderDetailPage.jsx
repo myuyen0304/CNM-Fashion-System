@@ -2,15 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import LoadingSpinner from "../../components/LoadingSpinner";
-
-const STATUS_LABELS = {
-  pending: "Chờ thanh toán",
-  paid: "Đã thanh toán",
-  completed: "Đã thanh toán",
-  shipping: "Đang giao",
-  delivered: "Hoàn tất",
-  cancelled: "Hủy",
-};
+import {
+  getOrderDisplayStatus,
+  normalizeOrderStatus,
+} from "../../utils/orderStatus";
 
 const getItemProductId = (item) => {
   if (!item?.productId) return "";
@@ -150,24 +145,14 @@ export default function OrderDetailPage() {
         ].filter(Boolean)
       : [order.shippingAddress, order.shippingPhone].filter(Boolean);
 
-  const displayStatus = STATUS_LABELS[order.status] || order.status || "N/A";
-  const isPendingOrder =
-    order.status === "pending" || order.status === "Chờ thanh toán";
+  const normalizedStatus = normalizeOrderStatus(order.status);
+  const displayStatus = getOrderDisplayStatus(order.status);
+  const isPendingOrder = normalizedStatus === "pending";
+  const isReviewableStatus =
+    normalizedStatus === "paid" || normalizedStatus === "delivered";
 
   return (
     <div className="max-w-4xl mx-auto">
-      <Link
-        to="/"
-        className="btn-primary fixed left-8 top-28 z-40 hidden lg:inline-flex px-4 py-2 shadow-lg"
-      >
-        Quay về trang chủ
-      </Link>
-      <Link
-        to="/"
-        className="btn-primary fixed right-4 bottom-4 z-40 inline-flex lg:hidden px-4 py-2 shadow-lg"
-      >
-        Trang chủ
-      </Link>
       <h1 className="text-3xl font-bold mb-6">Chi tiết đơn hàng</h1>
 
       {/* Order info */}
@@ -319,7 +304,7 @@ export default function OrderDetailPage() {
       )}
 
       {/* Review section */}
-      {(order.status === "Đã thanh toán" || order.status === "Hoàn tất") && (
+      {isReviewableStatus && (
         <div className="card p-6 mb-8">
           <h3 className="font-bold mb-4">Đánh giá sản phẩm</h3>
 
