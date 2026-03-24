@@ -1,7 +1,8 @@
 ﻿import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import { useCart } from "../../contexts/CartContext";
+import { useAuth } from "../../contexts/AuthContext";
 import ProductCard from "../../components/ProductCard";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/ui/Button";
@@ -11,6 +12,7 @@ import PriceTag from "../../components/ui/PriceTag";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [similar, setSimilar] = useState([]);
   const [selectedSize, setSelectedSize] = useState("");
@@ -20,6 +22,7 @@ export default function ProductDetailPage() {
   const [adding, setAdding] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const { addItem } = useCart();
+  const { token } = useAuth();
 
   useEffect(() => {
     const fetch = async () => {
@@ -75,11 +78,22 @@ export default function ProductDetailPage() {
   }, [id]);
 
   const handleAddToCart = async () => {
+    if (!token) {
+      alert("Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.");
+      navigate("/login");
+      return;
+    }
+
     try {
       setAdding(true);
       await addItem(product._id, quantity, selectedSize);
       alert("Đã thêm vào giỏ hàng");
     } catch (err) {
+      if (err.response?.status === 401) {
+        alert("Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.");
+        navigate("/login");
+        return;
+      }
       alert(err.response?.data?.message || "Lỗi");
     } finally {
       setAdding(false);
@@ -130,7 +144,10 @@ export default function ProductDetailPage() {
             <div className="text-gray-500">Đã bán {product.soldCount}</div>
           </div>
 
-          <PriceTag value={product.price} className="text-4xl mb-6 inline-block" />
+          <PriceTag
+            value={product.price}
+            className="text-4xl mb-6 inline-block"
+          />
 
           <p className="text-gray-700 mb-6">{product.description}</p>
 
@@ -193,7 +210,9 @@ export default function ProductDetailPage() {
               <Card key={review._id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="font-semibold">{review.customerId?.name}</div>
+                    <div className="font-semibold">
+                      {review.customerId?.name}
+                    </div>
                     <div className="text-xs text-gray-400 mt-0.5">
                       {review.createdAt
                         ? new Date(review.createdAt).toLocaleString("vi-VN", {
@@ -206,11 +225,17 @@ export default function ProductDetailPage() {
                         : ""}
                     </div>
                   </div>
-                  <div className="text-yellow-500">{"★".repeat(review.rating)}</div>
+                  <div className="text-yellow-500">
+                    {"★".repeat(review.rating)}
+                  </div>
                 </div>
                 <p className="text-gray-700">{review.comment}</p>
                 {review.imageUrl && (
-                  <img src={review.imageUrl} alt="" className="mt-3 max-w-xs rounded" />
+                  <img
+                    src={review.imageUrl}
+                    alt=""
+                    className="mt-3 max-w-xs rounded"
+                  />
                 )}
               </Card>
             ))}

@@ -46,7 +46,9 @@ export default function Navbar() {
         const cleanedCategories = categories
           .map((category) => String(category || "").trim())
           .filter(Boolean)
-          .filter((category) => !RESERVED_MENU_LABELS.has(category.toLowerCase()))
+          .filter(
+            (category) => !RESERVED_MENU_LABELS.has(category.toLowerCase()),
+          )
           .filter((category) => {
             const key = category.toLowerCase();
             if (seen.has(key)) return false;
@@ -76,7 +78,7 @@ export default function Navbar() {
           ? { ...item, dropdownItems: categoryItems }
           : item.label === "TRỢ GIÚP"
             ? { ...item, dropdownItems: HELP_MENU_ITEMS }
-          : item,
+            : item,
       ),
     [categoryItems],
   );
@@ -145,6 +147,7 @@ export default function Navbar() {
             ]
       }
       cartCount={isCustomer ? cartCount : 0}
+      showCart={isCustomer}
     />
   );
 }

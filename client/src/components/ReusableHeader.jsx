@@ -11,6 +11,7 @@ export default function ReusableHeader({
   rightLinks = [],
   cartCount = 0,
   cartTo = "/cart",
+  showCart = true,
 }) {
   return (
     <header className="bg-white text-black border-b border-gray-200 sticky top-0 z-50">
@@ -121,15 +122,17 @@ export default function ReusableHeader({
                   </button>
                 ),
               )}
-              <Link
-                to={cartTo}
-                className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
-              >
-                GIỎ HÀNG
-                <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
-                  {cartCount}
-                </span>
-              </Link>
+              {showCart && (
+                <Link
+                  to={cartTo}
+                  className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                >
+                  GIỎ HÀNG
+                  <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
+                    {cartCount}
+                  </span>
+                </Link>
+              )}
             </div>
           </div>
 
@@ -145,23 +148,24 @@ export default function ReusableHeader({
                   {item.label}
                 </Link>
 
-                {Array.isArray(item.dropdownItems) && item.dropdownItems.length > 0 && (
-                  <div className="absolute left-1/2 top-full z-50 hidden w-64 -translate-x-1/2 pt-2 group-hover:block">
-                    <div className="rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-                      <div className="max-h-80 overflow-y-auto">
-                        {item.dropdownItems.map((subItem) => (
-                          <Link
-                            key={`${item.label}-${subItem.to}`}
-                            to={subItem.to}
-                            className="block rounded px-3 py-2 text-sm normal-case text-gray-700 hover:bg-gray-100 hover:text-primary"
-                          >
-                            {subItem.label}
-                          </Link>
-                        ))}
+                {Array.isArray(item.dropdownItems) &&
+                  item.dropdownItems.length > 0 && (
+                    <div className="absolute left-1/2 top-full z-50 hidden w-64 -translate-x-1/2 pt-2 group-hover:block">
+                      <div className="rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                        <div className="max-h-80 overflow-y-auto">
+                          {item.dropdownItems.map((subItem) => (
+                            <Link
+                              key={`${item.label}-${subItem.to}`}
+                              to={subItem.to}
+                              className="block rounded px-3 py-2 text-sm normal-case text-gray-700 hover:bg-gray-100 hover:text-primary"
+                            >
+                              {subItem.label}
+                            </Link>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             ))}
           </div>

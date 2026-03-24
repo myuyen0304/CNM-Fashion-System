@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
 import { useAuth } from "../contexts/AuthContext";
 import Card from "./ui/Card";
@@ -9,6 +9,7 @@ import PriceTag from "./ui/PriceTag";
 export default function ProductCard({ product }) {
   const { addItem } = useCart();
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const isLoggedIn = Boolean(token);
 
@@ -23,11 +24,22 @@ export default function ProductCard({ product }) {
 
   const handleAddToCart = async (e) => {
     e.preventDefault();
+    if (!isLoggedIn) {
+      alert("Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.");
+      navigate("/login");
+      return;
+    }
+
     try {
       setAdding(true);
       await addItem(product._id, 1, availableSizes[0] || "");
       alert("Đã thêm vào giỏ hàng");
     } catch (err) {
+      if (err.response?.status === 401) {
+        alert("Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.");
+        navigate("/login");
+        return;
+      }
       alert(err.response?.data?.message || "Lỗi khi thêm vào giỏ");
     } finally {
       setAdding(false);
@@ -64,7 +76,9 @@ export default function ProductCard({ product }) {
 
           <div className="flex items-center justify-between mt-2">
             <span className="text-yellow-500">★ {product.avgRating}</span>
-            <span className="text-gray-500 text-sm">Bán {product.soldCount}</span>
+            <span className="text-gray-500 text-sm">
+              Bán {product.soldCount}
+            </span>
           </div>
 
           <div className="flex items-center justify-between mt-4">
@@ -79,7 +93,9 @@ export default function ProductCard({ product }) {
                 {adding ? "..." : "Thêm"}
               </Button>
             ) : (
-              <span className="text-sm font-medium text-primary">Xem chi tiết</span>
+              <span className="text-sm font-medium text-primary">
+                Xem chi tiết
+              </span>
             )}
           </div>
         </div>
