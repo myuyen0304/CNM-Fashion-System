@@ -15,7 +15,7 @@ export const normalizeOrderStatus = (status) => {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
+    .replace(/[đð]/g, "d")
     .replace(/[^a-z\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -59,7 +59,9 @@ export const normalizeOrderStatus = (status) => {
   if (
     compact === "cancelled" ||
     compact === "canceled" ||
-    compact.includes("huy")
+    compact.includes("huy") ||
+    compact === "hy" ||
+    compact.endsWith("hy")
   ) {
     return "cancelled";
   }
