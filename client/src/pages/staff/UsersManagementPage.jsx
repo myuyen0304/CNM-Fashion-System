@@ -30,7 +30,7 @@ export default function UsersManagementPage() {
       setUsers(data.users || []);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load users");
+      alert(err.response?.data?.message || "Không thể tải danh sách người dùng");
     } finally {
       setLoading(false);
     }
@@ -42,23 +42,23 @@ export default function UsersManagementPage() {
   }, [page, roleFilter, activeFilter]);
 
   const changeRole = async (userId, role) => {
-    if (!window.confirm(`Change role for this user to "${role}"?`)) return;
+    if (!window.confirm(`Thay đổi vai trò người dùng thành "${role}"?`)) return;
     try {
       await axiosClient.patch(`/users/${userId}/role`, { role });
       fetchUsers(page);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot update role");
+      alert(err.response?.data?.message || "Không thể cập nhật vai trò");
     }
   };
 
   const toggleActive = async (userId, isActive) => {
-    if (!window.confirm(`${isActive ? "Activate" : "Deactivate"} this account?`))
+    if (!window.confirm(`${isActive ? "Kích hoạt" : "Vô hiệu hóa"} tài khoản này?`))
       return;
     try {
       await axiosClient.patch(`/users/${userId}/active-status`, { isActive });
       fetchUsers(page);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot update status");
+      alert(err.response?.data?.message || "Không thể cập nhật trạng thái");
     }
   };
 
@@ -66,14 +66,14 @@ export default function UsersManagementPage() {
 
   return (
     <StaffLayout
-      title="Admin - User Management"
+      title="Quản Lý Người Dùng - Admin"
       subtitle="Phân quyền và khóa/mở khóa tài khoản người dùng"
     >
       <div className="card p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
             className="input-field"
-            placeholder="Search name/email"
+            placeholder="Tìm kiếm tên/email"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             onKeyDown={(e) => {
@@ -91,7 +91,7 @@ export default function UsersManagementPage() {
               setPage(1);
             }}
           >
-            <option value="">All roles</option>
+            <option value="">Tất cả vai trò</option>
             {ROLE_OPTIONS.map((role) => (
               <option key={role} value={role}>
                 {role}
@@ -106,9 +106,9 @@ export default function UsersManagementPage() {
               setPage(1);
             }}
           >
-            <option value="">All status</option>
-            <option value="true">active</option>
-            <option value="false">inactive</option>
+            <option value="">Tất cả trạng thái</option>
+            <option value="true">hoạt động</option>
+            <option value="false">không hoạt động</option>
           </select>
           <div className="flex gap-2">
             <button
@@ -118,7 +118,7 @@ export default function UsersManagementPage() {
                 fetchUsers(1);
               }}
             >
-              Apply
+              Áp Dụng
             </button>
             <button
               className="btn-secondary flex-1"
@@ -129,7 +129,7 @@ export default function UsersManagementPage() {
                 setPage(1);
               }}
             >
-              Clear
+              Xóa
             </button>
           </div>
         </div>
@@ -139,11 +139,11 @@ export default function UsersManagementPage() {
         <table className="w-full min-w-[760px]">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-3 px-4">Name</th>
+              <th className="text-left py-3 px-4">Tên</th>
               <th className="text-left py-3 px-4">Email</th>
-              <th className="text-left py-3 px-4">Role</th>
-              <th className="text-left py-3 px-4">Status</th>
-              <th className="text-left py-3 px-4">Action</th>
+              <th className="text-left py-3 px-4">Vai Trò</th>
+              <th className="text-left py-3 px-4">Trạng Thái</th>
+              <th className="text-left py-3 px-4">Hành Động</th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +170,7 @@ export default function UsersManagementPage() {
                       user.isActive === false ? "text-red-600" : "text-green-600"
                     }
                   >
-                    {user.isActive === false ? "inactive" : "active"}
+                    {user.isActive === false ? "không hoạt động" : "hoạt động"}
                   </span>
                 </td>
                 <td className="py-3 px-4">
@@ -178,7 +178,7 @@ export default function UsersManagementPage() {
                     onClick={() => toggleActive(user._id, !(user.isActive !== false))}
                     className="btn-secondary text-sm"
                   >
-                    {user.isActive === false ? "Activate" : "Deactivate"}
+                    {user.isActive === false ? "Kích Hoạt" : "Vô Hiệu Hóa"}
                   </button>
                 </td>
               </tr>
@@ -194,7 +194,7 @@ export default function UsersManagementPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => prev - 1)}
           >
-            Prev
+            Trước
           </button>
           <span>
             {page} / {totalPages}
@@ -204,7 +204,7 @@ export default function UsersManagementPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => prev + 1)}
           >
-            Next
+            Tiếp Theo
           </button>
         </div>
       )}

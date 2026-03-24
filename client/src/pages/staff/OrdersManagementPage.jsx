@@ -12,11 +12,21 @@ const ORDER_STATUSES = [
   "Hủy",
 ];
 
+const LEGACY_STATUS_MAP = {
+  "Ch? thanh toán": "Chờ thanh toán",
+  "Ðã thanh toán": "Đã thanh toán",
+  "Ðang giao": "Đang giao",
+  "Hoàn t?t": "Hoàn tất",
+  "H?y": "Hủy",
+};
+
+const normalizeOrderStatus = (status) => LEGACY_STATUS_MAP[status] || status;
+
 const RETURN_ACTIONS = [
-  { value: "request", label: "Request return" },
-  { value: "approve", label: "Approve return" },
-  { value: "reject", label: "Reject return" },
-  { value: "complete", label: "Complete return" },
+  { value: "request", label: "Yêu Cầu Hoàn Lại" },
+  { value: "approve", label: "Phê Duyệt Hoàn Lại" },
+  { value: "reject", label: "Từ Chối Hoàn Lại" },
+  { value: "complete", label: "Hoàn Thành Hoàn Lại" },
 ];
 
 export default function OrdersManagementPage() {
@@ -50,10 +60,15 @@ export default function OrdersManagementPage() {
         },
       });
       const data = res.data?.data || {};
-      setOrders(data.orders || []);
+      setOrders(
+        (data.orders || []).map((order) => ({
+          ...order,
+          status: normalizeOrderStatus(order.status),
+        })),
+      );
       setTotalPages(data.totalPages || 1);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load orders");
+      alert(err.response?.data?.message || "Không thể tải đơn hàng");
     } finally {
       setLoading(false);
     }
@@ -67,7 +82,7 @@ export default function OrdersManagementPage() {
       });
       setRevenue(res.data?.data || null);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load revenue");
+      alert(err.response?.data?.message || "Không thể tải doanh thu");
     }
   };
 
@@ -82,20 +97,20 @@ export default function OrdersManagementPage() {
   }, [period, canViewRevenue]);
 
   const updateStatus = async (orderId, status) => {
-    if (!window.confirm(`Update order status to "${status}"?`)) return;
+    if (!window.confirm(`Cập nhật trạng thái đơn thành "${status}"?`)) return;
     try {
       await axiosClient.patch(`/orders/${orderId}/status`, { status });
       loadOrders(page);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot update order status");
+      alert(err.response?.data?.message || "Không thể cập nhật trạng thái đơn");
     }
   };
 
   const handleReturn = async (orderId, action) => {
-    if (!window.confirm(`Apply return action "${action}" for this order?`)) return;
+    if (!window.confirm(`Áp dụng hành động hoàn lại "${action}" cho đơn này?`)) return;
     const reason =
       action === "request"
-        ? window.prompt("Return reason:", "Customer return request") || ""
+        ? window.prompt("Lý do hoàn lại:", "Yêu cầu hoàn lại từ khách hàng") || ""
         : "";
     if (action === "request" && !reason.trim()) return;
 
@@ -106,7 +121,7 @@ export default function OrdersManagementPage() {
       });
       loadOrders(page);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot handle return");
+      alert(err.response?.data?.message || "Không thể xử lý hoàn lại");
     }
   };
 
@@ -114,7 +129,7 @@ export default function OrdersManagementPage() {
 
   return (
     <StaffLayout
-      title="Staff - Orders Management"
+      title="Quản Lý Đơn Hàng"
       subtitle="Cập nhật trạng thái đơn, xử lý đổi trả, xem doanh thu"
     >
       <div className="card p-4 mb-4">
@@ -127,7 +142,7 @@ export default function OrdersManagementPage() {
               setPage(1);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">Tất Cả Trạng Thái</option>
             {ORDER_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {status}
@@ -142,7 +157,7 @@ export default function OrdersManagementPage() {
               setPage(1);
             }}
           >
-            <option value="">All payments</option>
+            <option value="">Tất Cả Phương Thức Thanh Toán</option>
             <option value="VNPay">VNPay</option>
             <option value="MoMo">MoMo</option>
             <option value="PayPal">PayPal</option>
@@ -175,7 +190,7 @@ export default function OrdersManagementPage() {
               setPage(1);
             }}
           >
-            Clear Filters
+            Xóa Bộ Lọc
           </button>
         </div>
       </div>
@@ -183,26 +198,26 @@ export default function OrdersManagementPage() {
       {canViewRevenue && (
         <div className="card p-4 mb-6">
           <div className="flex items-center gap-4 mb-3">
-            <label className="font-semibold">Revenue period</label>
+            <label className="font-semibold">Kỳ Doanh Thu</label>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
               className="input-field max-w-[180px]"
             >
-              <option value="day">Day</option>
-              <option value="month">Month</option>
-              <option value="year">Year</option>
+              <option value="day">Hôm Nay</option>
+              <option value="month">Tháng Này</option>
+              <option value="year">Năm Này</option>
             </select>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-blue-50 rounded p-4">
-              <div className="text-sm text-gray-600">Total revenue</div>
+              <div className="text-sm text-gray-600">Tổng Doanh Thu</div>
               <div className="text-xl font-bold text-primary">
                 {(revenue?.totalRevenue || 0).toLocaleString("vi-VN")}₫
               </div>
             </div>
             <div className="bg-green-50 rounded p-4">
-              <div className="text-sm text-gray-600">Total paid orders</div>
+              <div className="text-sm text-gray-600">Tổng Số Đơn Đã Thanh Toán</div>
               <div className="text-xl font-bold text-green-700">
                 {revenue?.totalOrders || 0}
               </div>
@@ -215,12 +230,12 @@ export default function OrdersManagementPage() {
         <table className="w-full min-w-[920px]">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-3 px-4">Order</th>
-              <th className="text-left py-3 px-4">Customer</th>
-              <th className="text-left py-3 px-4">Total</th>
-              <th className="text-left py-3 px-4">Status</th>
-              <th className="text-left py-3 px-4">Return</th>
-              <th className="text-left py-3 px-4">Action</th>
+              <th className="text-left py-3 px-4">Đơn Hàng</th>
+              <th className="text-left py-3 px-4">Khách Hàng</th>
+              <th className="text-left py-3 px-4">Tổng Cộng</th>
+              <th className="text-left py-3 px-4">Trạng Thái</th>
+              <th className="text-left py-3 px-4">Hoàn Lại</th>
+              <th className="text-left py-3 px-4">Hành Động</th>
             </tr>
           </thead>
           <tbody>
@@ -233,7 +248,7 @@ export default function OrdersManagementPage() {
                   </div>
                 </td>
                 <td className="py-3 px-4">
-                  <div>{order.customerId?.name || "N/A"}</div>
+                  <div>{order.customerId?.name || "N/C"}</div>
                   <div className="text-xs text-gray-500">
                     {order.customerId?.email || ""}
                   </div>
@@ -253,7 +268,7 @@ export default function OrdersManagementPage() {
                   </select>
                 </td>
                 <td className="py-3 px-4">
-                  {order.returnRequest?.status || "none"}
+                  {order.returnRequest?.status || "không"}
                 </td>
                 <td className="py-3 px-4">
                   {canHandleReturn ? (
@@ -269,7 +284,7 @@ export default function OrdersManagementPage() {
                       ))}
                     </div>
                   ) : (
-                    <span className="text-sm text-gray-400">No return permission</span>
+                    <span className="text-sm text-gray-400">Không có quyền hoàn lại</span>
                   )}
                 </td>
               </tr>
@@ -285,7 +300,7 @@ export default function OrdersManagementPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => prev - 1)}
           >
-            Prev
+            Trước
           </button>
           <span>
             {page} / {totalPages}
@@ -295,7 +310,7 @@ export default function OrdersManagementPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => prev + 1)}
           >
-            Next
+            Tiếp Theo
           </button>
         </div>
       )}

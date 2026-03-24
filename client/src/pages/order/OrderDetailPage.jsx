@@ -12,6 +12,22 @@ const STATUS_LABELS = {
   cancelled: "Hủy",
 };
 
+const LEGACY_STATUS_TO_KEY = {
+  "Ch? thanh toán": "pending",
+  "Ðã thanh toán": "paid",
+  "Đã thanh toán": "paid",
+  "Ðang giao": "shipping",
+  "Đang giao": "shipping",
+  "Hoàn t?t": "delivered",
+  "H?y": "cancelled",
+};
+
+const normalizeStatusKey = (status) => {
+  if (!status) return "";
+  if (STATUS_LABELS[status]) return status;
+  return LEGACY_STATUS_TO_KEY[status] || status;
+};
+
 const getItemProductId = (item) => {
   if (!item?.productId) return "";
   if (typeof item.productId === "string") return item.productId;
@@ -150,9 +166,10 @@ export default function OrderDetailPage() {
         ].filter(Boolean)
       : [order.shippingAddress, order.shippingPhone].filter(Boolean);
 
-  const displayStatus = STATUS_LABELS[order.status] || order.status || "N/A";
-  const isPendingOrder =
-    order.status === "pending" || order.status === "Chờ thanh toán";
+  const normalizedStatus = normalizeStatusKey(order.status);
+  const displayStatus =
+    STATUS_LABELS[normalizedStatus] || normalizedStatus || "N/A";
+  const isPendingOrder = normalizedStatus === "pending";
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -319,7 +336,9 @@ export default function OrderDetailPage() {
       )}
 
       {/* Review section */}
-      {(order.status === "Đã thanh toán" || order.status === "Hoàn tất") && (
+      {(normalizedStatus === "paid" ||
+        normalizedStatus === "completed" ||
+        normalizedStatus === "delivered") && (
         <div className="card p-6 mb-8">
           <h3 className="font-bold mb-4">Đánh giá sản phẩm</h3>
 

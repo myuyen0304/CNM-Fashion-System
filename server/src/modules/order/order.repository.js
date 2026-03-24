@@ -1,6 +1,27 @@
 ﻿const Order = require("./order.model");
 const { ORDER_STATUS } = require("../../shared/constants");
 
+const LEGACY_ORDER_STATUS = {
+  PENDING: "Ch? thanh toán",
+  PAID: "Ðã thanh toán",
+  SHIPPING: "Ðang giao",
+  COMPLETED: "Hoàn t?t",
+  CANCELLED: "H?y",
+};
+
+const ORDER_STATUS_ALIASES = {
+  [ORDER_STATUS.PENDING]: [ORDER_STATUS.PENDING, LEGACY_ORDER_STATUS.PENDING],
+  [ORDER_STATUS.PAID]: [ORDER_STATUS.PAID, LEGACY_ORDER_STATUS.PAID],
+  [ORDER_STATUS.SHIPPING]: [ORDER_STATUS.SHIPPING, LEGACY_ORDER_STATUS.SHIPPING],
+  [ORDER_STATUS.COMPLETED]: [ORDER_STATUS.COMPLETED, LEGACY_ORDER_STATUS.COMPLETED],
+  [ORDER_STATUS.CANCELLED]: [ORDER_STATUS.CANCELLED, LEGACY_ORDER_STATUS.CANCELLED],
+};
+
+const resolveStatusFilter = (status) => {
+  if (!status) return [];
+  return ORDER_STATUS_ALIASES[status] || [status];
+};
+
 const createOrder = async (orderData) => {
   const order = new Order(orderData);
   return order.save();
@@ -30,7 +51,10 @@ const findAllOrders = async ({
   const skip = (page - 1) * limit;
   const filter = {};
 
-  if (status) filter.status = status;
+  if (status) {
+    const statuses = resolveStatusFilter(status);
+    filter.status = statuses.length > 1 ? { $in: statuses } : statuses[0];
+  }
   if (paymentMethod) filter.paymentMethod = paymentMethod;
   if (from || to) {
     filter.createdAt = {};
@@ -81,7 +105,12 @@ const findOrderByTransactionId = async (transactionId) => {
 
 const aggregateRevenue = async ({ period = "day", from, to }) => {
   const match = {
-    status: { $in: [ORDER_STATUS.PAID, ORDER_STATUS.COMPLETED] },
+    status: {
+      $in: [
+        ...resolveStatusFilter(ORDER_STATUS.PAID),
+        ...resolveStatusFilter(ORDER_STATUS.COMPLETED),
+      ],
+    },
   };
 
   if (from || to) {
@@ -132,4 +161,3 @@ module.exports = {
   findOrderByTransactionId,
   aggregateRevenue,
 };
-

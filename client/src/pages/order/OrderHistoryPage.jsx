@@ -12,6 +12,22 @@ const STATUS_LABELS = {
   cancelled: "Hủy",
 };
 
+const LEGACY_STATUS_TO_KEY = {
+  "Ch? thanh toán": "pending",
+  "Ðã thanh toán": "paid",
+  "Đã thanh toán": "paid",
+  "Ðang giao": "shipping",
+  "Đang giao": "shipping",
+  "Hoàn t?t": "delivered",
+  "H?y": "cancelled",
+};
+
+const normalizeStatusKey = (status) => {
+  if (!status) return "";
+  if (STATUS_LABELS[status]) return status;
+  return LEGACY_STATUS_TO_KEY[status] || status;
+};
+
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState([]);
   const [page, setPage] = useState(1);
@@ -51,12 +67,22 @@ export default function OrderHistoryPage() {
       ) : (
         <>
           <div className="space-y-4">
-            {orders.map((order) => (
-              <div
-                key={order._id}
-                className="card p-6 hover:shadow-lg transition"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            {orders.map((order) => {
+              const normalizedStatus = normalizeStatusKey(order.status);
+              const statusColor =
+                normalizedStatus === "delivered" ||
+                normalizedStatus === "completed"
+                  ? "text-green-600"
+                  : normalizedStatus === "cancelled"
+                    ? "text-red-600"
+                    : "text-blue-600";
+
+              return (
+                <div
+                  key={order._id}
+                  className="card p-6 hover:shadow-lg transition"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                   <div>
                     <div className="text-sm text-gray-500">Mã đơn hàng</div>
                     <div className="font-semibold">{order._id}</div>
@@ -78,26 +104,25 @@ export default function OrderHistoryPage() {
                   </div>
                   <div>
                     <div className="text-sm text-gray-500">Trạng thái</div>
-                    <div
-                      className={`font-semibold ${order.status === "delivered" || order.status === "completed" ? "text-green-600" : order.status === "cancelled" ? "text-red-600" : "text-blue-600"}`}
-                    >
-                      {STATUS_LABELS[order.status] || order.status || "N/A"}
+                    <div className={`font-semibold ${statusColor}`}>
+                      {STATUS_LABELS[normalizedStatus] || normalizedStatus || "N/A"}
                     </div>
                   </div>
-                </div>
+                  </div>
 
-                <div className="text-sm text-gray-600 mb-4">
-                  {order.items.length} sản phẩm
-                </div>
+                  <div className="text-sm text-gray-600 mb-4">
+                    {order.items.length} sản phẩm
+                  </div>
 
-                <Link
-                  to={`/order-detail/${order._id}`}
-                  className="text-primary hover:underline font-semibold"
-                >
-                  Xem chi tiết →
-                </Link>
-              </div>
-            ))}
+                  <Link
+                    to={`/order-detail/${order._id}`}
+                    className="text-primary hover:underline font-semibold"
+                  >
+                    Xem chi tiết →
+                  </Link>
+                </div>
+              );
+            })}
           </div>
 
           {/* Pagination */}

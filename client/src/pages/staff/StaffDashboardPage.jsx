@@ -14,17 +14,17 @@ export default function StaffDashboardPage() {
 
   return (
     <StaffLayout
-      title="Staff Dashboard"
-      subtitle={`Role hiện tại: ${role}`}
+      title="Bảng Điều Khiển Nhân Viên"
+      subtitle={`Vai trò hiện tại: ${role}`}
     >
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {canManageUsers && (
           <Link to="/admin/users" className="card p-5 hover:shadow-lg transition">
-            <div className="text-sm text-gray-500 mb-1">Admin</div>
-            <div className="text-lg font-semibold">User & Role Management</div>
+            <div className="text-sm text-gray-500 mb-1">Quản Trị Viên</div>
+            <div className="text-lg font-semibold">Quản Lý Người Dùng & Vai Trò</div>
             <div className="text-sm text-gray-600 mt-2">
-              Set role and active status for accounts.
+              Đặt vai trò và trạng thái hoạt động cho tài khoản.
             </div>
           </Link>
         )}
@@ -34,30 +34,30 @@ export default function StaffDashboardPage() {
             to="/staff/products"
             className="card p-5 hover:shadow-lg transition"
           >
-            <div className="text-sm text-gray-500 mb-1">Supervisor</div>
-            <div className="text-lg font-semibold">Products & Inventory</div>
+            <div className="text-sm text-gray-500 mb-1">Giám Sát Viên</div>
+            <div className="text-lg font-semibold">Sản Phẩm & Hàng Tồn Kho</div>
             <div className="text-sm text-gray-600 mt-2">
-              Update stock, rename/delete categories.
+              Cập nhật tồn kho, đổi tên/xóa danh mục.
             </div>
           </Link>
         )}
 
         {canManageOrders && (
           <Link to="/staff/orders" className="card p-5 hover:shadow-lg transition">
-            <div className="text-sm text-gray-500 mb-1">Staff</div>
-            <div className="text-lg font-semibold">Orders & Revenue</div>
+            <div className="text-sm text-gray-500 mb-1">Nhân Viên</div>
+            <div className="text-lg font-semibold">Đơn Hàng & Doanh Thu</div>
             <div className="text-sm text-gray-600 mt-2">
-              View orders, update status, handle returns.
+              Xem đơn hàng, cập nhật trạng thái, xử lý hoàn lại.
             </div>
           </Link>
         )}
 
         {canSupport && (
           <Link to="/staff/support" className="card p-5 hover:shadow-lg transition">
-            <div className="text-sm text-gray-500 mb-1">Employee</div>
-            <div className="text-lg font-semibold">Customer Support Chat</div>
+            <div className="text-sm text-gray-500 mb-1">Nhân Viên</div>
+            <div className="text-lg font-semibold">Chat Hỗ Trợ Khách Hàng</div>
             <div className="text-sm text-gray-600 mt-2">
-              Take support rooms and reply to customers.
+              Tiếp nhận phòng hỗ trợ và trả lời khách hàng.
             </div>
           </Link>
         )}

@@ -74,25 +74,25 @@ const cleanupOldLocalAvatar = async (oldAvatarUrl, newAvatarUrl) => {
 
 const getProfile = async (userId) => {
   const user = await userRepo.findById(userId);
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
   return user;
 };
 
 const updateProfile = async (userId, { name }) => {
   if (!name || !name.trim()) {
-    throw new ApiError(400, "Tên không du?c d? tr?ng.");
+    throw new ApiError(400, "Tên không được để trống.");
   }
 
   const user = await userRepo.updateProfile(userId, { name: name.trim() });
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
   return user;
 };
 
 const updateAvatar = async (userId, file) => {
-  if (!file) throw new ApiError(400, "Vui lòng ch?n ?nh.");
+  if (!file) throw new ApiError(400, "Vui lòng chọn ảnh.");
 
   const currentUser = await userRepo.findById(userId);
-  if (!currentUser) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!currentUser) throw new ApiError(404, "Không tìm thấy tài khoản.");
 
   const oldAvatarUrl = currentUser.avatarUrl || currentUser.avatar || "";
 
@@ -109,7 +109,7 @@ const updateAvatar = async (userId, file) => {
   }
 
   const user = await userRepo.updateAvatar(userId, avatarUrl);
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
 
   await cleanupOldLocalAvatar(oldAvatarUrl, avatarUrl);
 
@@ -118,25 +118,25 @@ const updateAvatar = async (userId, file) => {
 
 const changePassword = async (userId, { currentPassword, newPassword }) => {
   if (!currentPassword || !newPassword) {
-    throw new ApiError(400, "Vui lòng nh?p m?t kh?u hi?n t?i và m?t kh?u m?i.");
+    throw new ApiError(400, "Vui lòng nhập mật khẩu hiện tại và mật khẩu mới.");
   }
   if (newPassword.length < 6) {
-    throw new ApiError(400, "M?t kh?u m?i ph?i có ít nh?t 6 ký t?.");
+    throw new ApiError(400, "Mật khẩu mới phải có ít nhất 6 ký tự.");
   }
 
   const { User } = require("../auth/auth.model");
   const user = await User.findById(userId);
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
 
   const isMatch = await bcrypt.compare(currentPassword, user.password);
   if (!isMatch) {
-    throw new ApiError(400, "M?t kh?u hi?n t?i không dúng.");
+    throw new ApiError(400, "Mật khẩu hiện tại không đúng.");
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
   await userRepo.updatePassword(userId, hashedPassword);
 
-  return { message: "Ð?i m?t kh?u thành công." };
+  return { message: "Đổi mật khẩu thành công." };
 };
 
 const listUsers = async ({ page, limit, role, keyword, isActive }) => {
@@ -145,25 +145,25 @@ const listUsers = async ({ page, limit, role, keyword, isActive }) => {
 
 const setUserRole = async (actorUser, targetUserId, role) => {
   if (!Object.values(ROLES).includes(role)) {
-    throw new ApiError(400, "Role không h?p l?.");
+    throw new ApiError(400, "Role không hợp lệ.");
   }
 
   if (targetUserId.toString() === actorUser._id.toString() && role !== ROLES.ADMIN) {
-    throw new ApiError(400, "Admin không th? t? h? quy?n c?a chính mình.");
+    throw new ApiError(400, "Admin không thể tự hạ quyền của chính mình.");
   }
 
   const user = await userRepo.updateUserRole(targetUserId, role);
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
   return user;
 };
 
 const setUserActiveStatus = async (actorUser, targetUserId, isActive) => {
   if (targetUserId.toString() === actorUser._id.toString() && isActive === false) {
-    throw new ApiError(400, "Admin không th? t? khóa tài kho?n c?a chính mình.");
+    throw new ApiError(400, "Admin không thể tự khóa tài khoản của chính mình.");
   }
 
   const user = await userRepo.updateUserActiveStatus(targetUserId, isActive);
-  if (!user) throw new ApiError(404, "Không tìm th?y tài kho?n.");
+  if (!user) throw new ApiError(404, "Không tìm thấy tài khoản.");
   return user;
 };
 

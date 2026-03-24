@@ -19,7 +19,7 @@ export default function StaffLayout({ title, subtitle, children }) {
       <aside className="lg:col-span-3 xl:col-span-2">
         <div className="card p-4 lg:sticky lg:top-24">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">
-            Staff Navigation
+            Điều Hướng Nhân Viên
           </div>
           <nav className="space-y-1">
             <NavLink
@@ -31,7 +31,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                 }`
               }
             >
-              Dashboard
+              Bảng Điều Khiển
             </NavLink>
             {canUsers && (
               <NavLink
@@ -42,7 +42,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                   }`
                 }
               >
-                Users
+                Người Dùng
               </NavLink>
             )}
             {canProducts && (
@@ -54,7 +54,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                   }`
                 }
               >
-                Products & Inventory
+                Sản Phẩm & Tồn Kho
               </NavLink>
             )}
             {canOrders && (
@@ -66,7 +66,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                   }`
                 }
               >
-                Orders
+                Đơn Hàng
               </NavLink>
             )}
             {canSupport && (
@@ -78,7 +78,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                   }`
                 }
               >
-                Support Chat
+                Chat Hỗ Trợ
               </NavLink>
             )}
           </nav>

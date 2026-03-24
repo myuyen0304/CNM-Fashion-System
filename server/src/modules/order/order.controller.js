@@ -21,7 +21,7 @@ const getOrderDetail = catchAsync(async (req, res) => {
 
 const cancelOrder = catchAsync(async (req, res) => {
   const order = await orderService.cancelOrder(req.params.id, req.user._id);
-  res.json({ success: true, data: order, message: "H?y don hàng thành công." });
+  res.json({ success: true, data: order, message: "Hủy đơn hàng thành công." });
 });
 
 const getAllOrdersForStaff = catchAsync(async (req, res) => {

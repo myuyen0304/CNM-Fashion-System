@@ -32,8 +32,6 @@ export default function Navbar() {
   const role = user?.role;
   const isCustomer = role === "customer";
   const isAdmin = role === "admin";
-  const isStaff =
-    role === "admin" || role === "supervisor" || role === "employee";
   const [keyword, setKeyword] = useState("");
   const [categoryItems, setCategoryItems] = useState([]);
 
@@ -104,12 +102,6 @@ export default function Navbar() {
             Bảng Điều Khiển Quản Trị
           </Link>
           <div className="flex items-center gap-3 flex-wrap justify-end">
-            <Link
-              to="/staff"
-              className="hover:opacity-80 transition font-semibold"
-            >
-              Khu Quản Trị
-            </Link>
             <button
               onClick={handleLogout}
               className="bg-danger px-4 py-2 rounded-lg hover:bg-red-600 transition"
@@ -133,17 +125,27 @@ export default function Navbar() {
       menuItems={storeMenuItems}
       rightLinks={
         isLoggedIn
-          ? [
-              ...(isCustomer ? [{ to: "/orders", label: "TÀI KHOẢN" }] : []),
-              ...(isStaff ? [{ to: "/staff", label: "KHU QUẢN TRỊ" }] : []),
-              { to: "/profile", label: user?.name || "TÀI KHOẢN" },
-              { label: "ĐĂNG XUẤT", onClick: handleLogout },
-            ]
+          ? []
           : [
               { to: "/login", label: "ĐĂNG NHẬP" },
               { to: "/register", label: "ĐĂNG KÝ" },
             ]
       }
+      userMenu={
+        isLoggedIn
+          ? {
+              avatarUrl: user?.avatarUrl || user?.avatar || "",
+              displayName: user?.name || "User",
+              items: [
+                { to: "/orders", label: "Đơn hàng của tôi" },
+                { to: "/profile", label: "Thông tin cá nhân" },
+                { label: "Đăng xuất", onClick: handleLogout },
+              ],
+            }
+          : null
+      }
+      showCart={!isLoggedIn || isCustomer}
+      cartFirst={isCustomer}
       cartCount={isCustomer ? cartCount : 0}
     />
   );
