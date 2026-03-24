@@ -1,349 +1,418 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
-import ProductCard from "../../components/ProductCard";
-import LoadingSpinner from "../../components/LoadingSpinner";
+import slider2 from "../../assets/images/slider_2.webp";
+import slider3 from "../../assets/images/slider_3.webp";
 
 export default function HomePage() {
-  const [products, setProducts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [selectedCategories, setSelectedCategories] = useState([]);
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [minRating, setMinRating] = useState("");
-  const [sortBy, setSortBy] = useState("popular");
-  const [filterError, setFilterError] = useState("");
-  const [appliedFilters, setAppliedFilters] = useState({
-    categories: [],
-    minPrice: "",
-    maxPrice: "",
-    minRating: "",
-    sortBy: "popular",
+  const slides = [
+    { src: slider2, alt: "Khuyến mãi thời trang 1" },
+    { src: slider3, alt: "Khuyến mãi thời trang 2" },
+  ];
+
+  const [activeSlide, setActiveSlide] = useState(0);
+  const [bestSellerProducts, setBestSellerProducts] = useState([]);
+  const [newProducts, setNewProducts] = useState([]);
+  const bestSellerTrackRef = useRef(null);
+  const newProductsTrackRef = useRef(null);
+  const bestSellerDragRef = useRef({
+    isDown: false,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false,
   });
-  const productSectionRef = useRef(null);
-  const PAGE_SIZE = 40;
-
-  const scrollToProducts = () => {
-    if (!productSectionRef.current) return;
-    productSectionRef.current.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
-  };
-
-  const fetchProducts = useCallback(
-    async (targetPage = 1) => {
-      setLoading(true);
-
-      try {
-        const hasFilter =
-          appliedFilters.categories.length > 0 ||
-          Boolean(appliedFilters.minPrice) ||
-          Boolean(appliedFilters.maxPrice) ||
-          Boolean(appliedFilters.minRating) ||
-          appliedFilters.sortBy !== "popular";
-
-        let response;
-        if (hasFilter) {
-          response = await axiosClient.get("/products/filter", {
-            params: {
-              categories:
-                appliedFilters.categories.length > 0
-                  ? appliedFilters.categories.join(",")
-                  : undefined,
-              minPrice: appliedFilters.minPrice || undefined,
-              maxPrice: appliedFilters.maxPrice || undefined,
-              minRating: appliedFilters.minRating || undefined,
-              sortBy: appliedFilters.sortBy,
-              page: targetPage,
-            },
-          });
-        } else {
-          response = await axiosClient.get(
-            `/products/popular?page=${targetPage}&limit=${PAGE_SIZE}`,
-          );
-        }
-
-        const payload = response.data?.data;
-
-        if (Array.isArray(payload)) {
-          setProducts(payload);
-          setTotalPages(
-            payload.length < PAGE_SIZE ? targetPage : targetPage + 1,
-          );
-          return;
-        }
-
-        const nextProducts = payload?.products || [];
-        const nextTotalPages = payload?.totalPages || 1;
-
-        setProducts(nextProducts);
-        setTotalPages(nextTotalPages);
-      } catch (err) {
-        console.error("Fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [PAGE_SIZE, appliedFilters],
-  );
+  const newProductsDragRef = useRef({
+    isDown: false,
+    startX: 0,
+    scrollLeft: 0,
+    moved: false,
+  });
+  const suppressClickRef = useRef(false);
 
   useEffect(() => {
-    fetchProducts(page);
-  }, [fetchProducts, page]);
+    const timer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % slides.length);
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadBestSellers = async () => {
       try {
-        const res = await axiosClient.get("/products/categories");
-        setCategories(Array.isArray(res.data?.data) ? res.data.data : []);
+        const res = await axiosClient.get("/products/popular", {
+          params: { page: 1, limit: 40 },
+        });
+        const products = Array.isArray(res.data?.data?.products)
+          ? res.data.data.products
+          : [];
+        const topBySold = [...products]
+          .sort((a, b) => Number(b.soldCount || 0) - Number(a.soldCount || 0))
+          .slice(0, 10);
+        setBestSellerProducts(topBySold);
       } catch (err) {
-        console.error("Load categories error:", err);
+        console.error("Load best seller products error:", err);
+        setBestSellerProducts([]);
       }
     };
 
-    loadCategories();
+    loadBestSellers();
   }, []);
 
-  const handleCategoryToggle = (categoryName) => {
-    setSelectedCategories((prev) =>
-      prev.includes(categoryName)
-        ? prev.filter((item) => item !== categoryName)
-        : [...prev, categoryName],
-    );
-  };
+  useEffect(() => {
+    const loadNewestProducts = async () => {
+      try {
+        const res = await axiosClient.get("/products/filter", {
+          params: { sortBy: "newest", page: 1 },
+        });
+        const products = Array.isArray(res.data?.data?.products)
+          ? res.data.data.products
+          : [];
+        setNewProducts(products.slice(0, 10));
+      } catch (err) {
+        console.error("Load newest products error:", err);
+        setNewProducts([]);
+      }
+    };
 
-  const handleNonNegativePriceChange = (setter) => (e) => {
-    const nextValue = e.target.value;
-    if (nextValue === "") {
-      setter("");
-      return;
-    }
+    loadNewestProducts();
+  }, []);
 
-    const numericValue = Number(nextValue);
-    if (!Number.isNaN(numericValue) && numericValue >= 0) {
-      setter(nextValue);
-    }
-  };
-
-  const applyFilters = () => {
-    const parsedMinPrice = minPrice === "" ? undefined : Number(minPrice);
-    const parsedMaxPrice = maxPrice === "" ? undefined : Number(maxPrice);
-
-    if (parsedMinPrice !== undefined && parsedMinPrice < 0) {
-      setFilterError("Giá tối thiểu không được là số âm.");
-      return;
-    }
-
-    if (parsedMaxPrice !== undefined && parsedMaxPrice < 0) {
-      setFilterError("Giá tối đa không được là số âm.");
-      return;
-    }
-
-    if (
-      parsedMinPrice !== undefined &&
-      parsedMaxPrice !== undefined &&
-      parsedMinPrice > parsedMaxPrice
-    ) {
-      setFilterError("Giá tối thiểu phải nhỏ hơn hoặc bằng giá tối đa.");
-      return;
-    }
-
-    setFilterError("");
-    setAppliedFilters({
-      categories: selectedCategories,
-      minPrice,
-      maxPrice,
-      minRating,
-      sortBy,
+  const scrollBestSeller = (direction) => {
+    if (!bestSellerTrackRef.current) return;
+    const track = bestSellerTrackRef.current;
+    const step = Math.max(320, Math.floor(track.clientWidth * 0.82));
+    track.scrollBy({
+      left: direction === "next" ? step : -step,
+      behavior: "smooth",
     });
-    setPage(1);
-    setIsFilterOpen(false);
-    scrollToProducts();
   };
 
-  const clearFilters = () => {
-    setSelectedCategories([]);
-    setMinPrice("");
-    setMaxPrice("");
-    setMinRating("");
-    setSortBy("popular");
-    setFilterError("");
-    setAppliedFilters({
-      categories: [],
-      minPrice: "",
-      maxPrice: "",
-      minRating: "",
-      sortBy: "popular",
+  const scrollNewProducts = (direction) => {
+    if (!newProductsTrackRef.current) return;
+    const track = newProductsTrackRef.current;
+    const step = Math.max(320, Math.floor(track.clientWidth * 0.82));
+    track.scrollBy({
+      left: direction === "next" ? step : -step,
+      behavior: "smooth",
     });
-    setPage(1);
-    setIsFilterOpen(false);
-    scrollToProducts();
   };
 
-  if (loading) return <LoadingSpinner />;
+  const getPointerX = (event) => {
+    if (event.touches && event.touches.length > 0) return event.touches[0].pageX;
+    if (event.changedTouches && event.changedTouches.length > 0) return event.changedTouches[0].pageX;
+    return event.pageX;
+  };
+
+  const startDrag = (event, trackRef, dragRef) => {
+    if (!trackRef.current) return;
+    if (event.button !== undefined && event.button !== 0) return;
+    const x = getPointerX(event);
+    dragRef.current.isDown = true;
+    dragRef.current.moved = false;
+    dragRef.current.startX = x - trackRef.current.offsetLeft;
+    dragRef.current.scrollLeft = trackRef.current.scrollLeft;
+    suppressClickRef.current = false;
+  };
+
+  const moveDrag = (event, trackRef, dragRef) => {
+    if (!dragRef.current.isDown || !trackRef.current) return;
+    if (event.cancelable) event.preventDefault();
+    const x = getPointerX(event);
+    const walk = (x - trackRef.current.offsetLeft - dragRef.current.startX) * 1.2;
+    if (Math.abs(walk) > 4) {
+      dragRef.current.moved = true;
+    }
+    trackRef.current.scrollLeft = dragRef.current.scrollLeft - walk;
+  };
+
+  const endDrag = (dragRef) => {
+    suppressClickRef.current = dragRef.current.moved;
+    dragRef.current.isDown = false;
+    dragRef.current.moved = false;
+    setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
+  };
+
+  const handleItemClickCapture = (event) => {
+    if (suppressClickRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
 
   return (
     <div>
-      <div className="bg-gradient-to-r from-primary to-blue-600 text-white rounded-lg p-12 mb-12 text-center">
-        <h1 className="text-4xl font-bold mb-4">Chào mừng đến E-Shop</h1>
-        <p className="text-xl">
-          Tìm kiếm hàng ngàn sản phẩm chất lượng với giá tốt nhất
-        </p>
-      </div>
+      <section className="relative left-1/2 right-1/2 w-screen -translate-x-1/2 -mt-8">
+        <div className="relative overflow-hidden">
+          <img
+            src={slides[activeSlide].src}
+            alt={slides[activeSlide].alt}
+            className="w-full h-[220px] md:h-[520px] object-cover transition-all duration-500"
+          />
+        </div>
+      </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        <div className="lg:hidden -mt-2">
+      <section className="py-6 md:py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <article className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 mt-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="w-9 h-9 text-black"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5l9-4.5 9 4.5-9 4.5-9-4.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7.5V16.5L12 21l9-4.5V7.5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 10.5l7.5-3.75" />
+                </svg>
+              </div>
+              <p className="type-subtitle leading-snug">
+                Vận chuyển <strong>MIỄN PHÍ</strong>
+                <br />
+                Trong khu vực <strong>TP.HCM</strong>
+              </p>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 mt-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="w-9 h-9 text-black"
+                >
+                  <rect x="3" y="4" width="14" height="10" rx="2" />
+                  <circle cx="8" cy="9" r="2" />
+                  <path strokeLinecap="round" d="M6 16h9M6 19h6" />
+                  <circle cx="19" cy="17.5" r="2.5" />
+                  <path strokeLinecap="round" d="M19 16v3M17.5 17.5h3" />
+                </svg>
+              </div>
+              <p className="type-subtitle leading-snug">
+                Tích điểm nâng hạng
+                <br />
+                <strong>THẺ THÀNH VIÊN</strong>
+              </p>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 mt-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="w-9 h-9 text-black"
+                >
+                  <rect x="3" y="6" width="18" height="5" rx="1.5" />
+                  <path d="M6 15h12a2 2 0 012 2v1H4v-1a2 2 0 012-2z" />
+                  <path strokeLinecap="round" d="M8 9h4" />
+                </svg>
+              </div>
+              <p className="type-subtitle leading-snug">
+                Tiến hành <strong>THANH TOÁN</strong>
+                <br />
+                Với nhiều <strong>PHƯƠNG THỨC</strong>
+              </p>
+            </div>
+          </article>
+
+          <article className="rounded-2xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 flex items-center justify-center shrink-0 mt-1">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className="w-9 h-9 text-black"
+                >
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 7l4 2.2v5.6L12 17l-4-2.2V9.2L12 7z" />
+                  <path strokeLinecap="round" d="M9 10.2l3 1.6 3-1.6" />
+                </svg>
+              </div>
+              <p className="type-subtitle leading-snug">
+                <strong>100% HOÀN TIỀN</strong>
+                <br />
+                nếu sản phẩm lỗi
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="py-3 md:py-6">
+        <div className="mb-6 text-center">
+          <h2 className="type-title">Sản Phẩm Bán Chạy</h2>
+          <div className="mx-auto mt-3 h-1 w-48 rounded-full bg-gray-200">
+            <div className="h-1 w-16 rounded-full bg-black mx-auto" />
+          </div>
+        </div>
+
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setIsFilterOpen((prev) => !prev)}
-            className="w-full btn-secondary py-3"
+            onClick={() => scrollBestSeller("prev")}
+            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 border border-gray-200 w-10 h-10 shadow hover:bg-white"
+            aria-label="Sản phẩm trước"
           >
-            {isFilterOpen ? "Ẩn bộ lọc" : "Mở bộ lọc"}
+            ‹
           </button>
-        </div>
 
-        <div
-          className={`lg:col-span-1 card p-6 h-fit lg:sticky lg:top-24 ${
-            isFilterOpen ? "block" : "hidden lg:block"
-          }`}
-        >
-          <h3 className="font-bold text-lg mb-4">Lọc</h3>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Danh mục</label>
-            <div className="max-h-52 overflow-auto border border-gray-200 rounded-lg p-3 space-y-2">
-              {categories.length === 0 ? (
-                <p className="text-sm text-gray-500">Chưa có danh mục</p>
-              ) : (
-                categories.map((item) => (
-                  <label
-                    key={item}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(item)}
-                      onChange={() => handleCategoryToggle(item)}
+          <div
+            ref={bestSellerTrackRef}
+            className="flex gap-4 overflow-x-auto scroll-smooth px-12 pb-2 select-none cursor-grab active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ touchAction: "pan-y" }}
+            onDragStart={(e) => e.preventDefault()}
+            onMouseDown={(e) => startDrag(e, bestSellerTrackRef, bestSellerDragRef)}
+            onMouseMove={(e) => moveDrag(e, bestSellerTrackRef, bestSellerDragRef)}
+            onMouseUp={() => endDrag(bestSellerDragRef)}
+            onMouseLeave={() => endDrag(bestSellerDragRef)}
+            onTouchStart={(e) => startDrag(e, bestSellerTrackRef, bestSellerDragRef)}
+            onTouchMove={(e) => moveDrag(e, bestSellerTrackRef, bestSellerDragRef)}
+            onTouchEnd={() => endDrag(bestSellerDragRef)}
+          >
+            {bestSellerProducts.map((product, index) => (
+              <Link
+                key={product._id}
+                to={`/products/${product._id}`}
+                className="shrink-0 w-[280px] sm:w-[300px] lg:w-[320px]"
+                onClickCapture={handleItemClickCapture}
+              >
+                <article className="group">
+                  <div className="relative overflow-hidden bg-gray-100">
+                    <img
+                      src={product.images?.[0] || "/placeholder.jpg"}
+                      alt={product.name}
+                      draggable={false}
+                      className="w-full h-[360px] object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                    <span>{item}</span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
+                    <span className="absolute left-2 top-2 inline-flex h-10 min-w-10 items-center justify-center rounded-full bg-black px-2 text-sm font-bold text-white">
+                      #{index + 1}
+                    </span>
+                  </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Khoảng giá</label>
-            <input
-              type="number"
-              className="input-field mb-2"
-              value={minPrice}
-              min="0"
-              onChange={handleNonNegativePriceChange(setMinPrice)}
-              placeholder="Giá tối thiểu"
-            />
-            <input
-              type="number"
-              className="input-field"
-              value={maxPrice}
-              min="0"
-              onChange={handleNonNegativePriceChange(setMaxPrice)}
-              placeholder="Giá tối đa"
-            />
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">
-              Đánh giá tối thiểu
-            </label>
-            <select
-              className="input-field"
-              value={minRating}
-              onChange={(e) => setMinRating(e.target.value)}
-            >
-              <option value="">Tất cả</option>
-              <option value="4">Đánh giá cao (từ 4 sao)</option>
-              <option value="3">Từ 3 sao</option>
-              <option value="2">Từ 2 sao</option>
-              <option value="1">Từ 1 sao</option>
-            </select>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-medium mb-2">Sắp xếp</label>
-            <select
-              className="input-field"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="popular">Phổ biến</option>
-              <option value="price_asc">Giá thấp → cao</option>
-              <option value="price_desc">Giá cao → thấp</option>
-              <option value="newest">Mới nhất</option>
-              <option value="rating">Đánh giá cao</option>
-            </select>
-          </div>
-
-          <div className="space-y-3">
-            <button onClick={applyFilters} className="btn-primary w-full">
-              Áp dụng lọc
-            </button>
-            <button onClick={clearFilters} className="btn-secondary w-full">
-              Xóa lọc
-            </button>
-          </div>
-
-          {filterError && (
-            <p className="text-red-600 text-sm mt-3">{filterError}</p>
-          )}
-        </div>
-
-        <div ref={productSectionRef} className="lg:col-span-4">
-          <h2 className="text-3xl font-bold mb-8">
-            {appliedFilters.categories.length > 0 ||
-            appliedFilters.minPrice ||
-            appliedFilters.maxPrice ||
-            appliedFilters.minRating ||
-            appliedFilters.sortBy !== "popular"
-              ? "Kết quả lọc"
-              : "Sản phẩm phổ biến"}
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard key={product._id} product={product} />
+                  <div className="pt-3">
+                    <h3 className="text-xl md:text-2xl font-semibold leading-snug line-clamp-2 min-h-[56px]">
+                      {product.name}
+                    </h3>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {Number(product.price || 0).toLocaleString("vi-VN")}vnđ
+                      </p>
+                      <span className="rounded-full border border-black px-3 py-1 text-sm">
+                        Đã bán {product.soldCount || 0}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              </Link>
             ))}
           </div>
 
-          {products.length > 0 && (
-            <div className="mt-8 flex items-center justify-center gap-3">
-              <button
-                className="btn-secondary px-4 py-2 disabled:opacity-50"
-                disabled={page <= 1}
-                onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-              >
-                Trang trước
-              </button>
+          <button
+            type="button"
+            onClick={() => scrollBestSeller("next")}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 border border-gray-200 w-10 h-10 shadow hover:bg-white"
+            aria-label="Sản phẩm tiếp theo"
+          >
+            ›
+          </button>
+        </div>
+      </section>
 
-              <span className="px-3 py-2 text-sm text-gray-700">
-                Trang {page} / {totalPages}
-              </span>
+      <section className="py-3 md:py-6">
+        <div className="mb-6 text-center">
+          <h2 className="type-title">Sản Phẩm Mới</h2>
+          <div className="mx-auto mt-3 h-1 w-48 rounded-full bg-gray-200">
+            <div className="h-1 w-16 rounded-full bg-black mx-auto" />
+          </div>
+        </div>
 
-              <button
-                className="btn-secondary px-4 py-2 disabled:opacity-50"
-                disabled={page >= totalPages}
-                onClick={() =>
-                  setPage((prev) => Math.min(prev + 1, totalPages))
-                }
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => scrollNewProducts("prev")}
+            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 border border-gray-200 w-10 h-10 shadow hover:bg-white"
+            aria-label="Sản phẩm mới trước"
+          >
+            ‹
+          </button>
+
+          <div
+            ref={newProductsTrackRef}
+            className="flex gap-4 overflow-x-auto scroll-smooth px-12 pb-2 select-none cursor-grab active:cursor-grabbing [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{ touchAction: "pan-y" }}
+            onDragStart={(e) => e.preventDefault()}
+            onMouseDown={(e) => startDrag(e, newProductsTrackRef, newProductsDragRef)}
+            onMouseMove={(e) => moveDrag(e, newProductsTrackRef, newProductsDragRef)}
+            onMouseUp={() => endDrag(newProductsDragRef)}
+            onMouseLeave={() => endDrag(newProductsDragRef)}
+            onTouchStart={(e) => startDrag(e, newProductsTrackRef, newProductsDragRef)}
+            onTouchMove={(e) => moveDrag(e, newProductsTrackRef, newProductsDragRef)}
+            onTouchEnd={() => endDrag(newProductsDragRef)}
+          >
+            {newProducts.map((product) => (
+              <Link
+                key={product._id}
+                to={`/products/${product._id}`}
+                className="shrink-0 w-[280px] sm:w-[300px] lg:w-[320px]"
+                onClickCapture={handleItemClickCapture}
               >
-                Trang sau
-              </button>
-            </div>
-          )}
+                <article className="group">
+                  <div className="relative overflow-hidden bg-gray-100">
+                    <img
+                      src={product.images?.[0] || "/placeholder.jpg"}
+                      alt={product.name}
+                      draggable={false}
+                      className="w-full h-[360px] object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <span className="absolute left-2 top-2 rounded-full bg-black/75 px-3 py-1 text-xs font-semibold text-white">
+                      Mới
+                    </span>
+                  </div>
+
+                  <div className="pt-3">
+                    <h3 className="text-xl md:text-2xl font-semibold leading-snug line-clamp-2 min-h-[56px]">
+                      {product.name}
+                    </h3>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <p className="text-2xl font-semibold text-gray-900">
+                        {Number(product.price || 0).toLocaleString("vi-VN")}vnđ
+                      </p>
+                      <span className="rounded-full border border-black px-3 py-1 text-sm">
+                        Đã bán {product.soldCount || 0}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              </Link>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => scrollNewProducts("next")}
+            className="absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 border border-gray-200 w-10 h-10 shadow hover:bg-white"
+            aria-label="Sản phẩm mới tiếp theo"
+          >
+            ›
+          </button>
         </div>
       </section>
     </div>

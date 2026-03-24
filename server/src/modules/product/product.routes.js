@@ -5,6 +5,7 @@ const {
   protect,
   requireRole,
 } = require("../../shared/middleware/authMiddleware");
+const { ROLES } = require("../../shared/constants");
 const upload = require("../../shared/middleware/upload");
 
 // === PUBLIC routes ===
@@ -17,34 +18,59 @@ router.post(
   upload.single("image"),
   productController.imageSearch,
 );
-router.get("/:id", productController.getProductDetail);
-router.get("/:id/similar", productController.getSimilarProducts);
 
-// === ADMIN routes ===
+// === Staff routes (admin + supervisor) ===
 router.get(
   "/",
   protect,
-  requireRole("admin"),
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   productController.getAllProducts,
+);
+router.get(
+  "/admin/categories",
+  protect,
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  productController.getCategoryManagementList,
+);
+router.patch(
+  "/admin/categories/rename",
+  protect,
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  productController.renameCategory,
+);
+router.delete(
+  "/admin/categories/:name",
+  protect,
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  productController.deleteCategory,
 );
 router.post(
   "/",
   protect,
-  requireRole("admin"),
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   upload.array("images", 5),
   productController.createProduct,
 );
 router.put(
   "/:id",
   protect,
-  requireRole("admin"),
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   productController.updateProduct,
+);
+router.patch(
+  "/:id/stock",
+  protect,
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  productController.updateStock,
 );
 router.delete(
   "/:id",
   protect,
-  requireRole("admin"),
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   productController.deleteProduct,
 );
+
+router.get("/:id", productController.getProductDetail);
+router.get("/:id/similar", productController.getSimilarProducts);
 
 module.exports = router;

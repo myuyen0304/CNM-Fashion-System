@@ -1,24 +1,35 @@
-// Roles
+﻿// Roles
 const ROLES = {
   CUSTOMER: "customer",
   ADMIN: "admin",
+  SUPERVISOR: "supervisor",
+  EMPLOYEE: "employee",
 };
 
 // Order status
 const ORDER_STATUS = {
-  PENDING: "Chờ thanh toán",
-  PAID: "Đã thanh toán",
-  SHIPPING: "Đang giao",
-  COMPLETED: "Hoàn tất",
-  CANCELLED: "Hủy",
+  PENDING: "Ch? thanh toán",
+  PAID: "Ðã thanh toán",
+  SHIPPING: "Ðang giao",
+  COMPLETED: "Hoàn t?t",
+  CANCELLED: "H?y",
 };
 
 // Transaction status
 const TRANSACTION_STATUS = {
   SUCCESS: "Thành công",
-  CANCELLED: "Đã hủy",
-  FAILED: "Thất bại",
-  EXPIRED: "Hết hạn",
+  CANCELLED: "Ðã h?y",
+  FAILED: "Th?t b?i",
+  EXPIRED: "H?t h?n",
+};
+
+// Return request status
+const RETURN_STATUS = {
+  NONE: "none",
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  COMPLETED: "completed",
 };
 
 // Payment methods
@@ -51,8 +62,10 @@ module.exports = {
   ROLES,
   ORDER_STATUS,
   TRANSACTION_STATUS,
+  RETURN_STATUS,
   PAYMENT_METHODS,
   SHIPPING_METHODS,
   PRODUCT_STATUS,
   SENDER_ROLES,
 };
+

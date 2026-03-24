@@ -138,6 +138,32 @@ const getAllProducts = catchAsync(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
+const updateStock = catchAsync(async (req, res) => {
+  const product = await productService.updateProductStock(
+    req.params.id,
+    req.body.stock,
+  );
+  res.json({ success: true, data: product });
+});
+
+const getCategoryManagementList = catchAsync(async (_req, res) => {
+  const data = await productService.getCategoryManagementList();
+  res.json({ success: true, data });
+});
+
+const renameCategory = catchAsync(async (req, res) => {
+  const result = await productService.renameCategory(req.body);
+  res.json({ success: true, data: result });
+});
+
+const deleteCategory = catchAsync(async (req, res) => {
+  const result = await productService.deleteCategory({
+    name: req.params.name,
+    moveTo: req.body?.moveTo,
+  });
+  res.json({ success: true, data: result });
+});
+
 module.exports = {
   searchByKeyword,
   filterProducts,
@@ -150,4 +176,8 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getAllProducts,
+  updateStock,
+  getCategoryManagementList,
+  renameCategory,
+  deleteCategory,
 };

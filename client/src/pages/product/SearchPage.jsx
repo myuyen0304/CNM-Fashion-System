@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import ProductCard from "../../components/ProductCard";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import Button from "../../components/ui/Button";
+import SectionHeading from "../../components/ui/SectionHeading";
+import Pagination from "../../components/ui/Pagination";
+import EmptyState from "../../components/ui/EmptyState";
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
@@ -139,16 +143,16 @@ export default function SearchPage() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <div className="lg:hidden -mb-3">
-        <button
+        <Button
           type="button"
           onClick={() => setIsFilterOpen((prev) => !prev)}
-          className="w-full btn-secondary py-3"
+          variant="secondary"
+          className="w-full py-3"
         >
           {isFilterOpen ? "Ẩn bộ lọc" : "Mở bộ lọc"}
-        </button>
+        </Button>
       </div>
 
-      {/* Sidebar */}
       <div
         className={`lg:col-span-1 card p-6 h-fit lg:sticky lg:top-24 ${
           isFilterOpen ? "block" : "hidden lg:block"
@@ -200,9 +204,7 @@ export default function SearchPage() {
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">
-            Đánh giá tối thiểu
-          </label>
+          <label className="block text-sm font-medium mb-2">Đánh giá tối thiểu</label>
           <select
             className="input-field"
             value={minRating}
@@ -231,24 +233,20 @@ export default function SearchPage() {
           </select>
         </div>
 
-        <button onClick={handleFilter} className="btn-primary w-full">
+        <Button onClick={handleFilter} className="w-full">
           Áp dụng lọc
-        </button>
-        {filterError && (
-          <p className="text-red-600 text-sm mt-3">{filterError}</p>
-        )}
+        </Button>
+        {filterError && <p className="text-red-600 text-sm mt-3">{filterError}</p>}
       </div>
 
-      {/* Products */}
       <div className="lg:col-span-3">
-        <h2 className="text-2xl font-bold mb-6">
-          {q ? `Kết quả tìm kiếm: "${q}"` : "Kết quả lọc"}
-        </h2>
+        <SectionHeading
+          title={q ? `Kết quả tìm kiếm: "${q}"` : "Kết quả lọc"}
+          className="mb-6"
+        />
 
         {products.length === 0 ? (
-          <p className="text-gray-500 text-center py-12">
-            Không tìm thấy sản phẩm
-          </p>
+          <EmptyState title="Không tìm thấy sản phẩm" />
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -257,28 +255,12 @@ export default function SearchPage() {
               ))}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2 mt-12">
-                <button
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-primary text-primary rounded disabled:opacity-50"
-                >
-                  Trước
-                </button>
-                <span className="px-4 py-2">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(Math.min(totalPages, page + 1))}
-                  disabled={page === totalPages}
-                  className="px-4 py-2 border border-primary text-primary rounded disabled:opacity-50"
-                >
-                  Sau
-                </button>
-              </div>
-            )}
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPrev={() => setPage(Math.max(1, page - 1))}
+              onNext={() => setPage(Math.min(totalPages, page + 1))}
+            />
           </>
         )}
       </div>

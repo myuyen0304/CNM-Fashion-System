@@ -151,6 +151,52 @@ const getAllProducts = async (page) => {
   return productRepo.findAll(page);
 };
 
+const updateProductStock = async (productId, stock) => {
+  const parsedStock = Number(stock);
+  if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+    throw new ApiError(400, "Tồn kho phải là số không âm.");
+  }
+
+  const product = await productRepo.updateStock(productId, parsedStock);
+  if (!product) throw new ApiError(404, "Không tìm thấy sản phẩm.");
+  return product;
+};
+
+const getCategoryManagementList = async () => {
+  return productRepo.listCategoriesWithCount();
+};
+
+const renameCategory = async ({ fromName, toName }) => {
+  const from = String(fromName || "").trim();
+  const to = String(toName || "").trim();
+  if (!from || !to) {
+    throw new ApiError(400, "Vui lòng nhập đầy đủ danh mục nguồn và danh mục mới.");
+  }
+  if (from.toLowerCase() === to.toLowerCase()) {
+    throw new ApiError(400, "Danh mục mới phải khác danh mục nguồn.");
+  }
+
+  const result = await productRepo.renameCategory(from, to);
+  return {
+    modifiedCount: result.modifiedCount || 0,
+    message: "Đổi tên danh mục thành công.",
+  };
+};
+
+const deleteCategory = async ({ name, moveTo }) => {
+  const categoryName = String(name || "").trim();
+  const moveTarget = String(moveTo || "").trim();
+  if (!categoryName) {
+    throw new ApiError(400, "Tên danh mục không hợp lệ.");
+  }
+
+  const result = await productRepo.removeCategory(categoryName, moveTarget);
+  return {
+    modifiedCount: result.modifiedCount || 0,
+    message: "Xử lý xóa danh mục thành công.",
+  };
+};
+
 module.exports = {
   search,
   filter,
@@ -163,4 +209,8 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getAllProducts,
+  updateProductStock,
+  getCategoryManagementList,
+  renameCategory,
+  deleteCategory,
 };

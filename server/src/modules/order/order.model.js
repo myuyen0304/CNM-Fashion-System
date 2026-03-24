@@ -1,8 +1,9 @@
-const mongoose = require("mongoose");
+﻿const mongoose = require("mongoose");
 const {
   ORDER_STATUS,
   TRANSACTION_STATUS,
   PAYMENT_METHODS,
+  RETURN_STATUS,
 } = require("../../shared/constants");
 
 const orderItemSchema = new mongoose.Schema({
@@ -42,6 +43,34 @@ const transactionSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+const returnRequestSchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: Object.values(RETURN_STATUS),
+      default: RETURN_STATUS.NONE,
+    },
+    reason: {
+      type: String,
+      default: "",
+    },
+    note: {
+      type: String,
+      default: "",
+    },
+    handledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    updatedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false },
+);
 
 const orderSchema = new mongoose.Schema(
   {
@@ -90,14 +119,18 @@ const orderSchema = new mongoose.Schema(
     },
     items: [orderItemSchema],
     transaction: transactionSchema,
+    returnRequest: {
+      type: returnRequestSchema,
+      default: () => ({ status: RETURN_STATUS.NONE }),
+    },
   },
   { timestamps: true },
 );
 
-// Index cho tìm kiếm nhanh
 orderSchema.index({ customerId: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
 
 const Order = mongoose.model("Order", orderSchema);
 
 module.exports = Order;
+

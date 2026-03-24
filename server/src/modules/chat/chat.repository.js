@@ -16,6 +16,36 @@ const findRoomByCustomer = async (customerId) => {
   return ChatRoom.findOne({ customerId });
 };
 
+const listRooms = async ({ page = 1, limit = 20, status, keyword }) => {
+  const skip = (page - 1) * limit;
+  const filter = {};
+  if (status) filter.status = status;
+
+  const [rooms, total] = await Promise.all([
+    ChatRoom.find(filter)
+      .populate("customerId", "name email avatarUrl")
+      .populate("adminId", "name email role")
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    ChatRoom.countDocuments(filter),
+  ]);
+
+  const filteredRooms = keyword
+    ? rooms.filter((room) => {
+        const text = `${room.customerId?.name || ""} ${room.customerId?.email || ""}`.toLowerCase();
+        return text.includes(String(keyword).toLowerCase());
+      })
+    : rooms;
+
+  return {
+    rooms: filteredRooms,
+    total: keyword ? filteredRooms.length : total,
+    page,
+    totalPages: Math.ceil((keyword ? filteredRooms.length : total) / limit) || 1,
+  };
+};
+
 const saveMessage = async (messageData) => {
   const message = new ChatMessage(messageData);
   return message.save();
@@ -77,6 +107,7 @@ module.exports = {
   findOrCreateRoom,
   findRoomById,
   findRoomByCustomer,
+  listRooms,
   saveMessage,
   countMessages,
   getMessages,

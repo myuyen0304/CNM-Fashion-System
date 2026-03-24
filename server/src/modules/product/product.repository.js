@@ -387,6 +387,57 @@ const findAll = async (page = 1, limit = 20) => {
   return { products, total, page, totalPages: Math.ceil(total / limit) };
 };
 
+const updateStock = async (productId, stock) => {
+  return Product.findByIdAndUpdate(
+    productId,
+    { stock },
+    { new: true, runValidators: true },
+  );
+};
+
+const listCategoriesWithCount = async () => {
+  const rows = await Product.aggregate([
+    {
+      $match: {
+        category: { $exists: true, $type: "string", $ne: "" },
+      },
+    },
+    {
+      $group: {
+        _id: { $trim: { input: "$category" } },
+        productCount: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  return rows
+    .map((row) => ({
+      name: String(row._id || "").trim(),
+      productCount: row.productCount || 0,
+    }))
+    .filter((row) => row.name);
+};
+
+const renameCategory = async (fromName, toName) => {
+  return Product.updateMany(
+    { category: { $regex: `^${escapeRegExp(fromName)}$`, $options: "i" } },
+    { $set: { category: toName } },
+  );
+};
+
+const removeCategory = async (name, moveTo) => {
+  const filter = {
+    category: { $regex: `^${escapeRegExp(name)}$`, $options: "i" },
+  };
+
+  if (moveTo) {
+    return Product.updateMany(filter, { $set: { category: moveTo } });
+  }
+
+  return Product.updateMany(filter, { $set: { category: "Khác" } });
+};
+
 module.exports = {
   findById,
   findPopular,
@@ -405,4 +456,8 @@ module.exports = {
   update,
   remove,
   findAll,
+  updateStock,
+  listCategoriesWithCount,
+  renameCategory,
+  removeCategory,
 };
