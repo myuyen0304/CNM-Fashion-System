@@ -7,7 +7,7 @@ const productRoutes = require("./modules/product/product.routes");
 const cartRoutes = require("./modules/cart/cart.routes");
 const orderRoutes = require("./modules/order/order.routes");
 const paymentRoutes = require("./modules/payment/payment.routes");
-const reviewRoutes = require("./modules/review/review.routes");
+const reviewRoutes = require("./review/review.routes");
 const chatRoutes = require("./modules/chat/chat.routes");
 
 /**

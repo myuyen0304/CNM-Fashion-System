@@ -1,5 +1,5 @@
 const reviewService = require("./review.service");
-const catchAsync = require("../../shared/utils/catchAsync");
+const catchAsync = require("../shared/utils/catchAsync");
 
 const createReview = catchAsync(async (req, res) => {
   const review = await reviewService.createReview(
