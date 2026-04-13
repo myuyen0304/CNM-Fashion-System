@@ -8,6 +8,28 @@ const {
 const orderRepo = require("../order/order.repository");
 const cartRepo = require("../cart/cart.repository");
 
+const getVNPayConfig = () => {
+  const config = {
+    vnpUrl: process.env.VNPAY_URL || process.env.VNPAY_API_URL,
+    tmnCode: process.env.VNPAY_TMN_CODE || process.env.VNPAY_MERCHANT_ID,
+    secretKey: process.env.VNPAY_HASH_SECRET,
+    returnUrl: process.env.VNPAY_RETURN_URL,
+  };
+
+  const missingKeys = Object.entries(config)
+    .filter(([, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingKeys.length > 0) {
+    throw new ApiError(
+      500,
+      `Thiếu cấu hình VNPay: ${missingKeys.join(", ")}. Vui lòng kiểm tra file .env.`,
+    );
+  }
+
+  return config;
+};
+
 /**
  * Sort params theo key alphabetically, loại bỏ giá trị rỗng/null.
  * Trả về object với RAW values (không encode).
@@ -49,10 +71,7 @@ const restoreUUID = (stripped) => {
  * Tạo URL thanh toán VNPay
  */
 const createVNPayURL = (orderId, amount, orderInfo, clientIp) => {
-  const vnpUrl = process.env.VNPAY_URL;
-  const tmnCode = process.env.VNPAY_TMN_CODE;
-  const secretKey = process.env.VNPAY_HASH_SECRET;
-  const returnUrl = process.env.VNPAY_RETURN_URL;
+  const { vnpUrl, tmnCode, secretKey, returnUrl } = getVNPayConfig();
 
   const date = new Date();
   const createDate =
@@ -121,7 +140,7 @@ const createVNPayURL = (orderId, amount, orderInfo, clientIp) => {
  * Verify VNPay callback signature
  */
 const verifyVNPaySignature = (vnpParams) => {
-  const secretKey = process.env.VNPAY_HASH_SECRET;
+  const { secretKey } = getVNPayConfig();
 
   // FIX #3: Clone object trước khi delete, không mutate req.query gốc
   const params = { ...vnpParams };
