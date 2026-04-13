@@ -1,4 +1,9 @@
-﻿import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+﻿import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { CartProvider } from "./contexts/CartContext";
 import Layout from "./components/Layout";
@@ -9,6 +14,9 @@ import ScrollToTop from "./components/ScrollToTop";
 // Auth pages
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
+import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 
 // Product pages
 import HomePage from "./pages/product/HomePage";
@@ -49,6 +57,13 @@ function App() {
               {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route
+                path="/verify-email/:token"
+                element={<VerifyEmailPage />}
+              />
 
               <Route element={<CustomerFacingRoute />}>
                 <Route path="/" element={<HomePage />} />
@@ -62,7 +77,10 @@ function App() {
                 <Route path="/bo-suu-tap" element={<CollectionPage />} />
                 <Route path="/Bo-suu-tap" element={<CollectionPage />} />
 
-                <Route path="/tin-tuc-thoi-trang" element={<FashionNewsPage />} />
+                <Route
+                  path="/tin-tuc-thoi-trang"
+                  element={<FashionNewsPage />}
+                />
                 <Route path="/tin-tuc" element={<FashionNewsPage />} />
                 <Route path="/Tin-tuc" element={<FashionNewsPage />} />
 
@@ -70,12 +88,18 @@ function App() {
                   path="/khuyen-mai"
                   element={<Navigate to="/search?q=khuyến%20mãi" replace />}
                 />
-                <Route path="/Khuyen-mai" element={<Navigate to="/khuyen-mai" replace />} />
+                <Route
+                  path="/Khuyen-mai"
+                  element={<Navigate to="/khuyen-mai" replace />}
+                />
 
                 <Route path="/tro-giup" element={<AboutUsPage />} />
                 <Route path="/Tro-giup" element={<AboutUsPage />} />
                 <Route path="/ve-chung-toi" element={<AboutUsPage />} />
-                <Route path="/cham-soc-khach-hang" element={<CustomerSupportPage />} />
+                <Route
+                  path="/cham-soc-khach-hang"
+                  element={<CustomerSupportPage />}
+                />
                 <Route path="/tuyen-dung-viec-lam" element={<CareersPage />} />
                 <Route path="/chinh-sach" element={<PolicyPage />} />
 
@@ -90,7 +114,10 @@ function App() {
                   <Route path="/cart" element={<CartPage />} />
                   <Route path="/checkout" element={<CheckoutPage />} />
                   <Route path="/orders" element={<OrderHistoryPage />} />
-                  <Route path="/order-detail/:id" element={<OrderDetailPage />} />
+                  <Route
+                    path="/order-detail/:id"
+                    element={<OrderDetailPage />}
+                  />
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/chat" element={<ChatPage />} />
                   <Route path="/chat/:id" element={<ChatPage />} />
@@ -106,7 +133,10 @@ function App() {
                 }
               >
                 <Route path="/staff" element={<StaffDashboardPage />} />
-                <Route path="/staff/orders" element={<OrdersManagementPage />} />
+                <Route
+                  path="/staff/orders"
+                  element={<OrdersManagementPage />}
+                />
                 <Route path="/staff/support" element={<SupportChatPage />} />
               </Route>
 

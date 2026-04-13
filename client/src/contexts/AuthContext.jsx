@@ -8,6 +8,14 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("accessToken"));
   const [loading, setLoading] = useState(true);
 
+  const clearAuthState = () => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("user");
+    setToken(null);
+    setUser(null);
+  };
+
   const syncUser = (nextUser) => {
     setUser(nextUser);
     if (nextUser) {
@@ -16,6 +24,24 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem("user");
     }
   };
+
+  useEffect(() => {
+    const syncAuthFromStorage = () => {
+      const nextToken = localStorage.getItem("accessToken");
+      const cachedUser = JSON.parse(localStorage.getItem("user") || "null");
+
+      setToken(nextToken);
+      setUser(cachedUser);
+    };
+
+    window.addEventListener("auth-state-changed", syncAuthFromStorage);
+    window.addEventListener("storage", syncAuthFromStorage);
+
+    return () => {
+      window.removeEventListener("auth-state-changed", syncAuthFromStorage);
+      window.removeEventListener("storage", syncAuthFromStorage);
+    };
+  }, []);
 
   useEffect(() => {
     // Kiểm tra token khi mount
@@ -34,7 +60,12 @@ export const AuthProvider = ({ children }) => {
             syncUser(freshUser);
           }
         })
-        .catch(() => {
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            clearAuthState();
+            return;
+          }
+
           // Giữ user cache nếu fetch profile lỗi tạm thời.
         });
     }
@@ -70,8 +101,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
 
-    setToken(null);
-    syncUser(null);
+    clearAuthState();
   };
 
   return (

@@ -2,6 +2,10 @@ import axios from "axios";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+const notifyAuthStateChanged = () => {
+  window.dispatchEvent(new Event("auth-state-changed"));
+};
+
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -12,6 +16,8 @@ const axiosClient = axios.create({
 const AUTH_PATHS_TO_SKIP_REFRESH = [
   "/auth/login",
   "/auth/register",
+  "/auth/verify-registration-otp",
+  "/auth/resend-registration-otp",
   "/auth/forgot-password",
   "/auth/reset-password",
   "/auth/verify-email",
@@ -98,12 +104,15 @@ axiosClient.interceptors.response.use(
 
         const { accessToken } = response.data;
         localStorage.setItem("accessToken", accessToken);
+        notifyAuthStateChanged();
 
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return axiosClient(originalRequest);
       } catch (err) {
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
+        localStorage.removeItem("user");
+        notifyAuthStateChanged();
 
         // Tránh reload cứng ngay tại trang login để thông báo lỗi còn hiển thị.
         if (window.location.pathname !== "/login") {

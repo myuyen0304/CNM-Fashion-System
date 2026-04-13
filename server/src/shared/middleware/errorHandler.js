@@ -7,7 +7,13 @@ const ApiError = require("../utils/ApiError");
 const errorHandler = (err, req, res, next) => {
   // Log lỗi cho dev debug
   if (process.env.NODE_ENV === "development") {
-    console.error("ERROR:", err);
+    if (err instanceof ApiError && err.statusCode < 500) {
+      console.warn(
+        `API ${err.statusCode} ${req.method} ${req.originalUrl}: ${err.message}`,
+      );
+    } else {
+      console.error("ERROR:", err);
+    }
   }
 
   // Lỗi nghiệp vụ (do mình throw)

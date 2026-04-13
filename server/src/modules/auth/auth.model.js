@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
     avatarUrl: {
       type: String,
       default: null,
@@ -67,5 +71,55 @@ refreshTokenSchema.index({ userId: 1 });
 
 const RefreshToken = mongoose.model("RefreshToken", refreshTokenSchema);
 
-module.exports = { User, RefreshToken };
+// ========================
+// OTP TOKEN
+// ========================
+const otpTokenSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    email: {
+      type: String,
+      required: true,
+      lowercase: true,
+      trim: true,
+      match: [EMAIL_REGEX, "Email không dúng d?nh d?ng"],
+    },
+    purpose: {
+      type: String,
+      enum: ["register_verification", "password_reset"],
+      required: true,
+    },
+    otpHash: {
+      type: String,
+      required: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+    attempts: {
+      type: Number,
+      default: 0,
+    },
+    resendCount: {
+      type: Number,
+      default: 0,
+    },
+    lastSentAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true },
+);
 
+otpTokenSchema.index({ email: 1, purpose: 1 }, { unique: true });
+otpTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const OtpToken = mongoose.model("OtpToken", otpTokenSchema);
+
+module.exports = { User, RefreshToken, OtpToken };

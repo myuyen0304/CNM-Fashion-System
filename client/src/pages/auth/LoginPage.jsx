@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
-import axiosClient from "../../api/axiosClient";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -9,6 +8,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const successMessage = location.state?.message || "";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,6 +32,11 @@ export default function LoginPage() {
 
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
+      )}
+      {successMessage && (
+        <div className="bg-green-100 text-green-700 p-3 rounded mb-4">
+          {successMessage}
+        </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -64,11 +70,26 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-6 space-y-2 text-center">
-        {/* <p>
+        <p>
           <Link to="/forgot-password" className="text-primary hover:underline">
             Quên mật khẩu?
           </Link>
-        </p> */}
+        </p>
+        {error.toLowerCase().includes("chưa được xác thực") && (
+          <p>
+            <button
+              type="button"
+              onClick={() =>
+                navigate("/verify-email", {
+                  state: { email: formData.email.trim().toLowerCase() },
+                })
+              }
+              className="text-primary hover:underline"
+            >
+              Nhập OTP xác thực tài khoản
+            </button>
+          </p>
+        )}
         <p>
           Chưa có tài khoản?{" "}
           <Link to="/register" className="text-primary hover:underline">
