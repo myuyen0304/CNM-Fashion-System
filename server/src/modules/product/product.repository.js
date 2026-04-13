@@ -91,6 +91,26 @@ const findPopular = async (page = 1, limit = 40) => {
   };
 };
 
+const findPopularExcluding = async (excludedIds = [], limit = 24) => {
+  const normalizedExcluded = (Array.isArray(excludedIds) ? excludedIds : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+  const filter = {
+    status: "active",
+    ...(normalizedExcluded.length > 0
+      ? { _id: { $nin: normalizedExcluded } }
+      : {}),
+  };
+
+  return Product.aggregate([
+    { $match: filter },
+    { $addFields: { popularScore: buildPopularScoreExpression() } },
+    { $sort: POPULAR_SORT },
+    { $limit: Math.max(1, limit) },
+  ]);
+};
+
 /**
  * Tìm kiếm bằng regex (keyword match tên, mô tả)
  * Ưu tiên: exact match name > startsWith name > contains name > category
@@ -302,6 +322,54 @@ const findAllWithVector = async () => {
   }).select("_id name price images imageVector category");
 };
 
+const findActiveByIds = async (ids = []) => {
+  const normalizedIds = (Array.isArray(ids) ? ids : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+  if (normalizedIds.length === 0) return [];
+
+  const products = await Product.find({
+    _id: { $in: normalizedIds },
+    status: "active",
+  });
+
+  const byId = new Map(products.map((item) => [String(item._id), item]));
+  return normalizedIds.map((id) => byId.get(id)).filter(Boolean);
+};
+
+const findActiveByCategories = async (
+  categories = [],
+  excludedIds = [],
+  limit = 80,
+) => {
+  const normalizedCategories = (Array.isArray(categories) ? categories : [])
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
+  if (normalizedCategories.length === 0) return [];
+
+  const categoryRegex = normalizedCategories.map(
+    (item) => new RegExp(`^${escapeRegExp(item)}$`, "i"),
+  );
+
+  const normalizedExcluded = (Array.isArray(excludedIds) ? excludedIds : [])
+    .map((id) => String(id || "").trim())
+    .filter(Boolean);
+
+  const filter = {
+    status: "active",
+    category: { $in: categoryRegex },
+    ...(normalizedExcluded.length > 0
+      ? { _id: { $nin: normalizedExcluded } }
+      : {}),
+  };
+
+  return Product.find(filter)
+    .sort({ soldCount: -1, viewCount: -1, avgRating: -1 })
+    .limit(Math.max(1, limit));
+};
+
 /**
  * Tìm sản phẩm tương tự (cùng category, trừ chính nó)
  */
@@ -441,11 +509,14 @@ const removeCategory = async (name, moveTo) => {
 module.exports = {
   findById,
   findPopular,
+  findPopularExcluding,
   listActiveCategories,
   findByKeyword,
   findByTextSearch,
   findByCriteria,
   findAllWithVector,
+  findActiveByIds,
+  findActiveByCategories,
   findSimilar,
   incrementViewCount,
   checkStockBatch,

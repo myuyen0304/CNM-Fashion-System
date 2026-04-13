@@ -1,4 +1,5 @@
 ﻿const Order = require("./order.model");
+const mongoose = require("mongoose");
 const { ORDER_STATUS } = require("../../shared/constants");
 
 const createOrder = async (orderData) => {
@@ -68,11 +69,7 @@ const updateTransaction = async (orderId, transactionData) => {
 };
 
 const updateReturnRequest = async (orderId, returnRequest) => {
-  return Order.findByIdAndUpdate(
-    orderId,
-    { returnRequest },
-    { new: true },
-  );
+  return Order.findByIdAndUpdate(orderId, { returnRequest }, { new: true });
 };
 
 const findOrderByTransactionId = async (transactionId) => {
@@ -121,6 +118,55 @@ const aggregateRevenue = async ({ period = "day", from, to }) => {
   ]);
 };
 
+const findRecentOrderItemsByCustomer = async (customerId, limit = 80) => {
+  return Order.find({ customerId })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .select("items.productId items.quantity createdAt")
+    .lean();
+};
+
+const aggregateCoPurchasedProducts = async (
+  seedProductIds,
+  excludedProductIds = [],
+  limit = 120,
+) => {
+  const normalizedSeeds = (Array.isArray(seedProductIds) ? seedProductIds : [])
+    .map((id) => String(id || "").trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  if (normalizedSeeds.length === 0) {
+    return [];
+  }
+
+  const normalizedExcluded = (
+    Array.isArray(excludedProductIds) ? excludedProductIds : []
+  )
+    .map((id) => String(id || "").trim())
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+  return Order.aggregate([
+    { $match: { "items.productId": { $in: normalizedSeeds } } },
+    { $unwind: "$items" },
+    {
+      $group: {
+        _id: "$items.productId",
+        coPurchaseCount: { $sum: { $ifNull: ["$items.quantity", 1] } },
+        latestOrderAt: { $max: "$createdAt" },
+      },
+    },
+    {
+      $match: {
+        _id: { $nin: normalizedExcluded.concat(normalizedSeeds) },
+      },
+    },
+    { $sort: { coPurchaseCount: -1, latestOrderAt: -1 } },
+    { $limit: Math.max(1, limit) },
+  ]);
+};
+
 module.exports = {
   createOrder,
   findOrderById,
@@ -131,5 +177,6 @@ module.exports = {
   updateReturnRequest,
   findOrderByTransactionId,
   aggregateRevenue,
+  findRecentOrderItemsByCustomer,
+  aggregateCoPurchasedProducts,
 };
-

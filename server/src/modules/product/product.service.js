@@ -6,7 +6,41 @@ const {
 } = require("../../shared/services/aiService");
 const { uploadToCloudinary } = require("../../config/cloudinary");
 const productRepo = require("./product.repository");
-const reviewRepo = require("../review/review.repository");
+const orderRepo = require("../order/order.repository");
+const reviewRepo = require("../../review/review.repository");
+
+const normalizeLimit = (limit, fallback = 8, max = 24) => {
+  const parsed = Number(limit);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.min(Math.max(1, Math.floor(parsed)), max);
+};
+
+const toIdString = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (value._id) return String(value._id);
+  return String(value);
+};
+
+const getMapMax = (map) => {
+  let max = 0;
+  for (const value of map.values()) {
+    if (value > max) max = value;
+  }
+  return max || 1;
+};
+
+const calculateRecencyBoost = (createdAt) => {
+  if (!createdAt) return 0;
+  const ageMs = Date.now() - new Date(createdAt).getTime();
+  if (!Number.isFinite(ageMs) || ageMs <= 0) return 1;
+
+  const ageDays = ageMs / (1000 * 60 * 60 * 24);
+  if (ageDays <= 14) return 1;
+  if (ageDays <= 60) return 0.7;
+  if (ageDays <= 180) return 0.4;
+  return 0.15;
+};
 
 /**
  * UC-01: Tìm kiếm sản phẩm bằng từ khóa
@@ -108,6 +142,181 @@ const getSimilar = async (productId) => {
   return productRepo.findSimilar(productId, product.category);
 };
 
+const getRecommendations = async ({ userId, currentProductId, limit = 8 }) => {
+  const normalizedLimit = normalizeLimit(limit, 8, 24);
+
+  if (!userId) {
+    const excludedIds = currentProductId ? [currentProductId] : [];
+    const products = await productRepo.findPopularExcluding(
+      excludedIds,
+      normalizedLimit,
+    );
+    return {
+      source: "cold_start",
+      products,
+    };
+  }
+
+  const [recentOrders, topRatedReviews] = await Promise.all([
+    orderRepo.findRecentOrderItemsByCustomer(userId, 80),
+    reviewRepo.findTopRatedByCustomer(userId, 4, 40),
+  ]);
+
+  const purchasedProductIds = new Set();
+  const purchaseStrengthMap = new Map();
+  const categoryWeightMap = new Map();
+  const seedProductIds = new Set();
+  const orderCount = recentOrders.length || 1;
+
+  recentOrders.forEach((order, index) => {
+    const recencyWeight = 0.8 + ((orderCount - index) / orderCount) * 0.6;
+
+    for (const item of order.items || []) {
+      const productId = toIdString(item.productId);
+      if (!productId) continue;
+
+      purchasedProductIds.add(productId);
+      seedProductIds.add(productId);
+
+      const qty = Number(item.quantity || 1);
+      const score = Math.max(1, qty) * recencyWeight;
+      purchaseStrengthMap.set(
+        productId,
+        (purchaseStrengthMap.get(productId) || 0) + score,
+      );
+    }
+  });
+
+  const purchasedProducts = await productRepo.findActiveByIds([
+    ...purchasedProductIds,
+  ]);
+  for (const product of purchasedProducts) {
+    const category = String(product.category || "").trim();
+    if (!category) continue;
+    const productId = String(product._id);
+    const score = purchaseStrengthMap.get(productId) || 0;
+    categoryWeightMap.set(
+      category,
+      (categoryWeightMap.get(category) || 0) + score,
+    );
+  }
+
+  for (const review of topRatedReviews) {
+    const ratedProductId = toIdString(review.productId);
+    if (ratedProductId) seedProductIds.add(ratedProductId);
+
+    const category = review.productId?.category;
+    if (category) {
+      const ratingScore = Math.max(1, Number(review.rating || 0) - 2);
+      const key = String(category).trim();
+      categoryWeightMap.set(
+        key,
+        (categoryWeightMap.get(key) || 0) + ratingScore,
+      );
+    }
+  }
+
+  const excludedIds = new Set([...purchasedProductIds]);
+  if (currentProductId) excludedIds.add(String(currentProductId));
+
+  const preferredCategories = [...categoryWeightMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([category]) => category);
+
+  const [coPurchasedRows, categoryCandidates] = await Promise.all([
+    orderRepo.aggregateCoPurchasedProducts(
+      [...seedProductIds],
+      [...excludedIds],
+      120,
+    ),
+    productRepo.findActiveByCategories(
+      preferredCategories,
+      [...excludedIds],
+      80,
+    ),
+  ]);
+
+  const coPurchaseMap = new Map(
+    coPurchasedRows.map((row) => [
+      String(row._id),
+      Number(row.coPurchaseCount || 0),
+    ]),
+  );
+
+  const candidateIdSet = new Set([
+    ...coPurchasedRows.map((row) => String(row._id)),
+    ...categoryCandidates.map((item) => String(item._id)),
+  ]);
+
+  if (candidateIdSet.size === 0) {
+    const products = await productRepo.findPopularExcluding(
+      [...excludedIds],
+      normalizedLimit,
+    );
+    return {
+      source: "fallback_popular",
+      products,
+    };
+  }
+
+  const candidates = await productRepo.findActiveByIds([...candidateIdSet]);
+  const maxCoPurchase = getMapMax(coPurchaseMap);
+  const maxCategoryWeight = getMapMax(categoryWeightMap);
+  const maxSold = Math.max(
+    ...candidates.map((item) => Number(item.soldCount || 0)),
+    1,
+  );
+  const maxView = Math.max(
+    ...candidates.map((item) => Number(item.viewCount || 0)),
+    1,
+  );
+
+  const scored = candidates
+    .map((item) => {
+      const id = String(item._id);
+      const category = String(item.category || "").trim();
+
+      const coPurchaseScore = (coPurchaseMap.get(id) || 0) / maxCoPurchase;
+      const categoryScore =
+        (categoryWeightMap.get(category) || 0) / maxCategoryWeight;
+      const popularityScore =
+        (Number(item.soldCount || 0) / maxSold) * 0.7 +
+        (Number(item.viewCount || 0) / maxView) * 0.3;
+      const ratingScore = Number(item.avgRating || 0) / 5;
+      const noveltyScore = calculateRecencyBoost(item.createdAt);
+
+      const finalScore =
+        coPurchaseScore * 0.42 +
+        categoryScore * 0.25 +
+        popularityScore * 0.2 +
+        ratingScore * 0.08 +
+        noveltyScore * 0.05;
+
+      return { item, finalScore };
+    })
+    .sort((a, b) => b.finalScore - a.finalScore)
+    .slice(0, normalizedLimit)
+    .map((entry) => entry.item);
+
+  if (scored.length < normalizedLimit) {
+    const topUp = await productRepo.findPopularExcluding(
+      [...excludedIds, ...scored.map((item) => String(item._id))],
+      normalizedLimit - scored.length,
+    );
+
+    return {
+      source: "hybrid",
+      products: [...scored, ...topUp],
+    };
+  }
+
+  return {
+    source: "hybrid",
+    products: scored,
+  };
+};
+
 /**
  * Sản phẩm phổ biến (trang chủ)
  */
@@ -170,7 +379,10 @@ const renameCategory = async ({ fromName, toName }) => {
   const from = String(fromName || "").trim();
   const to = String(toName || "").trim();
   if (!from || !to) {
-    throw new ApiError(400, "Vui lòng nhập đầy đủ danh mục nguồn và danh mục mới.");
+    throw new ApiError(
+      400,
+      "Vui lòng nhập đầy đủ danh mục nguồn và danh mục mới.",
+    );
   }
   if (from.toLowerCase() === to.toLowerCase()) {
     throw new ApiError(400, "Danh mục mới phải khác danh mục nguồn.");
@@ -203,6 +415,7 @@ module.exports = {
   imageSearch,
   getDetail,
   getSimilar,
+  getRecommendations,
   getPopular,
   getCategories,
   createProduct,

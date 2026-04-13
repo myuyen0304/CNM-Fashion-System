@@ -15,6 +15,7 @@ export default function ProductDetailPage() {
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [similar, setSimilar] = useState([]);
+  const [recommended, setRecommended] = useState([]);
   const [selectedSize, setSelectedSize] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -43,10 +44,20 @@ export default function ProductDetailPage() {
         setProduct(currentProduct);
         setSelectedSize(availableSizes[0] || "");
 
-        const [similarRes, reviewsRes] = await Promise.allSettled([
-          axiosClient.get(`/products/${id}/similar`),
-          axiosClient.get(`/reviews/product/${id}`),
-        ]);
+        const [similarRes, reviewsRes, recommendRes] = await Promise.allSettled(
+          [
+            axiosClient.get(`/products/${id}/similar`),
+            axiosClient.get(`/reviews/product/${id}`),
+            axiosClient.get(
+              token
+                ? "/products/recommendations/me"
+                : "/products/recommendations",
+              {
+                params: { currentProductId: id, limit: 8 },
+              },
+            ),
+          ],
+        );
 
         if (similarRes.status === "fulfilled") {
           setSimilar(similarRes.value.data.data || []);
@@ -59,10 +70,17 @@ export default function ProductDetailPage() {
         } else {
           setReviews([]);
         }
+
+        if (recommendRes.status === "fulfilled") {
+          setRecommended(recommendRes.value.data?.data?.products || []);
+        } else {
+          setRecommended([]);
+        }
       } catch (err) {
         if (err.response?.status === 404) {
           setProduct(null);
           setSimilar([]);
+          setRecommended([]);
           setReviews([]);
           setNotFound(true);
           return;
@@ -75,7 +93,7 @@ export default function ProductDetailPage() {
     };
 
     fetch();
-  }, [id]);
+  }, [id, token]);
 
   const handleAddToCart = async () => {
     if (!token) {
@@ -242,6 +260,17 @@ export default function ProductDetailPage() {
           </div>
         )}
       </section>
+
+      {recommended.length > 0 && (
+        <section className="mb-12">
+          <SectionHeading title="Dành cho bạn" className="mb-6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {recommended.map((p) => (
+              <ProductCard key={p._id} product={p} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {similar.length > 0 && (
         <section>

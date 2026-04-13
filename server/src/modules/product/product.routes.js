@@ -18,6 +18,12 @@ router.post(
   upload.single("image"),
   productController.imageSearch,
 );
+router.get("/recommendations", productController.getPublicRecommendations);
+router.get(
+  "/recommendations/me",
+  protect,
+  productController.getRecommendations,
+);
 
 // === Staff routes (admin + supervisor) ===
 router.get(

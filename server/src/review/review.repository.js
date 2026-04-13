@@ -62,6 +62,22 @@ const calculateAvgRating = async (productId) => {
   };
 };
 
+const findTopRatedByCustomer = async (
+  customerId,
+  minRating = 4,
+  limit = 40,
+) => {
+  return Review.find({
+    customerId,
+    rating: { $gte: minRating },
+  })
+    .sort({ rating: -1, createdAt: -1 })
+    .limit(limit)
+    .populate("productId", "_id category")
+    .select("productId rating createdAt")
+    .lean();
+};
+
 module.exports = {
   createReview,
   findReviewById,
@@ -69,4 +85,5 @@ module.exports = {
   findByCustomerAndProduct,
   findByCustomerAndOrder,
   calculateAvgRating,
+  findTopRatedByCustomer,
 };
