@@ -1,15 +1,55 @@
 const nodemailer = require("nodemailer");
 
+const getEmailConfig = () => {
+  const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
+  const user = process.env.EMAIL_USER || process.env.SMTP_USER;
+  const pass = process.env.EMAIL_PASSWORD || process.env.SMTP_PASS;
+
+  return {
+    host: process.env.EMAIL_HOST || process.env.SMTP_HOST,
+    port,
+    secure: port === 465,
+    user,
+    pass,
+    from: process.env.EMAIL_FROM || user,
+  };
+};
+
+const emailConfig = getEmailConfig();
+
 // Tạo transporter 1 lần, dùng lại
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false, // true cho port 465
+  host: emailConfig.host,
+  port: emailConfig.port,
+  secure: emailConfig.secure,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: emailConfig.user,
+    pass: emailConfig.pass,
   },
 });
+
+const logMailResult = (label, mailOptions, info) => {
+  if (process.env.NODE_ENV !== "development") {
+    return;
+  }
+
+  console.info(
+    `[Email:${label}] accepted=${JSON.stringify(info.accepted || [])} rejected=${JSON.stringify(info.rejected || [])} pending=${JSON.stringify(info.pending || [])}`,
+  );
+  console.info(
+    `[Email:${label}] to=${mailOptions.to} messageId=${info.messageId || "n/a"} response=${info.response || "n/a"}`,
+  );
+
+  if (info.envelope) {
+    console.info(`[Email:${label}] envelope=${JSON.stringify(info.envelope)}`);
+  }
+};
+
+const sendMailWithDebug = async (label, mailOptions) => {
+  const info = await transporter.sendMail(mailOptions);
+  logMailResult(label, mailOptions, info);
+  return info;
+};
 
 /**
  * Gửi email OTP xác minh tài khoản
@@ -17,8 +57,8 @@ const transporter = nodemailer.createTransport({
 const sendRegistrationOtpEmail = async (email, name, otp, token) => {
   const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${token}`;
 
-  await transporter.sendMail({
-    from: `"E-commerce Shop" <${process.env.SMTP_USER}>`,
+  await sendMailWithDebug("register-otp", {
+    from: `"E-commerce Shop" <${emailConfig.from}>`,
     to: email,
     subject: "OTP xác thực tài khoản",
     html: `
@@ -45,8 +85,8 @@ const sendRegistrationOtpEmail = async (email, name, otp, token) => {
  * Gửi email OTP đặt lại mật khẩu
  */
 const sendResetPasswordOtpEmail = async (email, name, otp) => {
-  await transporter.sendMail({
-    from: `"E-commerce Shop" <${process.env.SMTP_USER}>`,
+  await sendMailWithDebug("reset-password-otp", {
+    from: `"E-commerce Shop" <${emailConfig.from}>`,
     to: email,
     subject: "OTP đặt lại mật khẩu",
     html: `

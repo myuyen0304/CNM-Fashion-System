@@ -10,20 +10,20 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Tên là b?t bu?c"],
+      required: [true, "Tên là bắt buộc"],
       trim: true,
     },
     email: {
       type: String,
-      required: [true, "Email là b?t bu?c"],
+      required: [true, "Email là bắt buộc"],
       unique: true,
       lowercase: true,
       trim: true,
-      match: [EMAIL_REGEX, "Email không dúng d?nh d?ng"],
+      match: [EMAIL_REGEX, "Email không đúng định dạng"],
     },
     password: {
       type: String,
-      required: [true, "M?t kh?u là b?t bu?c"],
+      required: [true, "Mật khẩu là bắt buộc"],
       minlength: 8,
     },
     role: {
@@ -86,7 +86,7 @@ const otpTokenSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
-      match: [EMAIL_REGEX, "Email không dúng d?nh d?ng"],
+      match: [EMAIL_REGEX, "Email không đúng định dạng"],
     },
     purpose: {
       type: String,

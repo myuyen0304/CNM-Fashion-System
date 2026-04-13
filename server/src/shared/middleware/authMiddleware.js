@@ -4,9 +4,9 @@ const { ROLES } = require("../constants");
 const User = require("../../modules/auth/auth.model").User;
 
 /**
- * Middleware xác th?c JWT.
- * L?y token t? header Authorization: Bearer <token>
- * G?n user vào req.user
+ * Middleware xác thực JWT.
+ * Lấy token từ header Authorization: Bearer <token>
+ * Gắn user vào req.user
  */
 const protect = async (req, res, next) => {
   try {
@@ -14,7 +14,7 @@ const protect = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       throw new ApiError(
         401,
-        "Chua dang nh?p. Vui lòng dang nh?p d? ti?p t?c.",
+        "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.",
       );
     }
 
@@ -23,38 +23,38 @@ const protect = async (req, res, next) => {
 
     const user = await User.findById(decoded.userId).select("-password");
     if (!user) {
-      throw new ApiError(401, "Tài kho?n không t?n t?i.");
+      throw new ApiError(401, "Tài khoản không tồn tại.");
     }
 
     if (user.isActive === false) {
-      throw new ApiError(403, "Tài kho?n dã b? khóa.");
+      throw new ApiError(403, "Tài khoản đã bị khóa.");
     }
 
     req.user = user;
     next();
   } catch (error) {
     if (error.name === "JsonWebTokenError") {
-      return next(new ApiError(401, "Token không h?p l?."));
+      return next(new ApiError(401, "Token không hợp lệ."));
     }
     if (error.name === "TokenExpiredError") {
-      return next(new ApiError(401, "Token dã h?t h?n."));
+      return next(new ApiError(401, "Token đã hết hạn."));
     }
     next(error);
   }
 };
 
 /**
- * Middleware ki?m tra role.
+ * Middleware kiểm tra role.
  * Dùng: router.get('/admin', protect, requireRole('admin'), controller)
  */
 const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return next(new ApiError(401, "Chua dang nh?p."));
+      return next(new ApiError(401, "Chưa đăng nhập."));
     }
     if (!roles.includes(req.user.role)) {
       return next(
-        new ApiError(403, "B?n không có quy?n th?c hi?n thao tác này."),
+        new ApiError(403, "Bạn không có quyền thực hiện thao tác này."),
       );
     }
     next();
@@ -68,4 +68,3 @@ const requireAnyStaffRole = requireRole(
 );
 
 module.exports = { protect, requireRole, requireAnyStaffRole };
-

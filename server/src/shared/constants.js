@@ -8,19 +8,19 @@ const ROLES = {
 
 // Order status
 const ORDER_STATUS = {
-  PENDING: "Ch? thanh toán",
-  PAID: "Ðã thanh toán",
-  SHIPPING: "Ðang giao",
-  COMPLETED: "Hoàn t?t",
-  CANCELLED: "H?y",
+  PENDING: "Chờ thanh toán",
+  PAID: "Đã thanh toán",
+  SHIPPING: "Đang giao",
+  COMPLETED: "Hoàn tất",
+  CANCELLED: "Hủy",
 };
 
 // Transaction status
 const TRANSACTION_STATUS = {
   SUCCESS: "Thành công",
-  CANCELLED: "Ðã h?y",
-  FAILED: "Th?t b?i",
-  EXPIRED: "H?t h?n",
+  CANCELLED: "Đã hủy",
+  FAILED: "Thất bại",
+  EXPIRED: "Hết hạn",
 };
 
 // Return request status
@@ -68,4 +68,3 @@ module.exports = {
   PRODUCT_STATUS,
   SENDER_ROLES,
 };
-
