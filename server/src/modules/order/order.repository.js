@@ -61,11 +61,11 @@ const updateOrderStatus = async (orderId, status) => {
 };
 
 const updateTransaction = async (orderId, transactionData) => {
-  return Order.findByIdAndUpdate(
-    orderId,
-    { transaction: transactionData },
-    { new: true },
-  );
+  const sets = {};
+  for (const key of Object.keys(transactionData)) {
+    sets[`transaction.${key}`] = transactionData[key];
+  }
+  return Order.findByIdAndUpdate(orderId, { $set: sets }, { new: true });
 };
 
 const updateReturnRequest = async (orderId, returnRequest) => {
