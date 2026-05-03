@@ -18,7 +18,7 @@ const setupRoutes = (app) => {
   // === Public routes (no auth required) ===
   app.use("/api/auth", authRoutes);
   app.use("/api/products", productRoutes);
-  app.use("/api/payments", paymentRoutes); // Callback VNPay không cần auth
+  app.use("/api/payments", paymentRoutes); // Initiate cần auth (tự handle trong route), callback VNPay public
 
   // === Protected routes (require authentication) ===
   app.use("/api/users", protect, userRoutes);

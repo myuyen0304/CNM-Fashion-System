@@ -190,8 +190,7 @@ const handleVNPayCallback = async (vnpParams) => {
 
   if (responseCode === "00") {
     transactionStatus = TRANSACTION_STATUS.SUCCESS;
-    // Auto-complete order on successful payment to enable immediate reviews
-    orderStatus = ORDER_STATUS.COMPLETED;
+    orderStatus = ORDER_STATUS.PAID;
   } else if (responseCode === "24") {
     transactionStatus = TRANSACTION_STATUS.CANCELLED;
   } else if (responseCode === "99") {
@@ -208,7 +207,7 @@ const handleVNPayCallback = async (vnpParams) => {
   if (orderStatus !== ORDER_STATUS.PENDING) {
     await orderRepo.updateOrderStatus(orderId, orderStatus);
 
-    if (orderStatus === ORDER_STATUS.COMPLETED) {
+    if (orderStatus === ORDER_STATUS.PAID || orderStatus === ORDER_STATUS.COMPLETED) {
       await cartRepo.clearCart(order.customerId);
     }
   }
@@ -219,10 +218,15 @@ const handleVNPayCallback = async (vnpParams) => {
 /**
  * Tạo payment request
  */
-const initiatePayment = async (orderId, paymentMethod, clientIp) => {
+const initiatePayment = async (orderId, paymentMethod, clientIp, userId) => {
   const order = await orderRepo.findOrderById(orderId);
   if (!order) {
     throw new ApiError(404, "Không tìm thấy đơn hàng.");
+  }
+
+  const ownerId = order.customerId?._id ?? order.customerId;
+  if (String(ownerId) !== String(userId)) {
+    throw new ApiError(403, "Bạn không có quyền thanh toán đơn hàng này.");
   }
 
   if (!order.total || order.total <= 0) {

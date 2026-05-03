@@ -23,6 +23,7 @@ const initiatePayment = catchAsync(async (req, res) => {
     orderId,
     method,
     clientIp,
+    req.user._id,
   );
   res.json({ success: true, data: result });
 });
