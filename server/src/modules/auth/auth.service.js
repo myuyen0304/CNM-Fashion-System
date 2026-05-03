@@ -179,10 +179,10 @@ const register = async ({ name, email, password }) => {
 const login = async ({ email, password }) => {
   const user = await authRepo.findUserByEmail(normalizeEmail(email));
   if (!user) {
-    throw new ApiError(401, "Invalid email or password.");
+    throw new ApiError(401, "Email hoặc mật khẩu không chính xác.");
   }
   if (user.isActive === false) {
-    throw new ApiError(403, "Account is deactivated.");
+    throw new ApiError(403, "Tài khoản đã bị khóa.");
   }
   if (!user.isVerified) {
     throw new ApiError(
@@ -193,7 +193,7 @@ const login = async ({ email, password }) => {
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new ApiError(401, "Invalid email or password.");
+    throw new ApiError(401, "Email hoặc mật khẩu không chính xác.");
   }
 
   const accessToken = jwt.sign(
