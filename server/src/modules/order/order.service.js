@@ -63,6 +63,7 @@ const createOrder = async (
     normalizedPaymentMethod = PAYMENT_METHODS.PAYPAL;
   }
 
+  const normalizedItems = [];
   for (const item of items) {
     const product = await Product.findById(item.productId);
     if (!product) {
@@ -74,19 +75,27 @@ const createOrder = async (
         `Only ${product.stock} units left for product "${product.name}".`,
       );
     }
+    normalizedItems.push({
+      productId: item.productId,
+      name: product.name,
+      imageUrl: item.imageUrl || product.images?.[0] || null,
+      unitPrice: product.price,
+      quantity: item.quantity,
+      size: item.size,
+    });
   }
 
   let subtotal = 0;
-  items.forEach((item) => {
+  for (const item of normalizedItems) {
     subtotal += item.unitPrice * item.quantity;
-  });
+  }
 
   const shippingFee = shippingMethod === "express" ? 50000 : 20000;
   const total = subtotal + shippingFee;
 
   const order = await orderRepo.createOrder({
     customerId,
-    items,
+    items: normalizedItems,
     shippingAddress: normalizedShippingAddress,
     shippingPhone: normalizedShippingPhone,
     shippingMethod,
@@ -100,8 +109,20 @@ const createOrder = async (
     },
   });
 
-  for (const item of items) {
-    await productRepo.decreaseStock(item.productId, item.quantity);
+  const decreasedItems = [];
+  for (const item of normalizedItems) {
+    const updated = await productRepo.decreaseStock(item.productId, item.quantity);
+    if (!updated) {
+      for (const prev of decreasedItems) {
+        await productRepo.increaseStock(prev.productId, prev.quantity);
+      }
+      await orderRepo.updateOrderStatus(order._id, ORDER_STATUS.CANCELLED);
+      throw new ApiError(
+        400,
+        `Sản phẩm "${item.name || item.productId}" vừa hết hàng. Vui lòng thử lại.`,
+      );
+    }
+    decreasedItems.push(item);
   }
 
   return order;
