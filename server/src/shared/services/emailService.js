@@ -46,6 +46,17 @@ const logMailResult = (label, mailOptions, info) => {
 };
 
 const sendMailWithDebug = async (label, mailOptions) => {
+  if (process.env.NODE_ENV === "development") {
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      logMailResult(label, mailOptions, info);
+      return info;
+    } catch (err) {
+      console.warn(`[Email:${label}] Skipped (dev) — ${err.message}`);
+      return null;
+    }
+  }
+
   const info = await transporter.sendMail(mailOptions);
   logMailResult(label, mailOptions, info);
   return info;

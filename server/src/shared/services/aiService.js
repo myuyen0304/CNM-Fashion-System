@@ -1,47 +1,11 @@
 /**
  * AI Service
- * - extractFeatures: mock image embedding cho image search
- * - cosineSimilarity: tính độ tương đồng vector
  * - claudeChatbotReply: chatbot dùng Google Gemini API
  */
 
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// ========================
-// IMAGE SEARCH (mock)
-// ========================
-
-/**
- * Trích xuất feature vector từ ảnh (dùng cho image search).
- * TODO: Tích hợp AI thật (Python API / TensorFlow.js / OpenAI CLIP).
- * Mock: trả random vector 128 chiều.
- */
-const extractFeatures = async (imageBuffer) => {
-  const vector = Array.from({ length: 128 }, () => Math.random());
-  const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
-  return vector.map((v) => v / magnitude);
-};
-
-/**
- * Tính cosine similarity giữa 2 vector.
- */
-const cosineSimilarity = (vecA, vecB) => {
-  if (vecA.length !== vecB.length) return 0;
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    magnitudeA += vecA[i] * vecA[i];
-    magnitudeB += vecB[i] * vecB[i];
-  }
-  magnitudeA = Math.sqrt(magnitudeA);
-  magnitudeB = Math.sqrt(magnitudeB);
-  if (magnitudeA === 0 || magnitudeB === 0) return 0;
-  return dotProduct / (magnitudeA * magnitudeB);
-};
 
 // ========================
 // CHATBOT (Google Gemini API)
@@ -142,4 +106,4 @@ const claudeChatbotReply = async (message, history = [], productContext = []) =>
   return replyText;
 };
 
-module.exports = { extractFeatures, cosineSimilarity, claudeChatbotReply };
+module.exports = { claudeChatbotReply };

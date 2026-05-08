@@ -59,58 +59,69 @@ client/
 
 1. **Navigate to server directory**
 
- ```bash
- cd server
- npm install
- ```
+```bash
+cd server
+npm install
+```
 
 2. **Create .env file** (copy from .env.example)
 
- ```bash
- cp .env.example .env
- ```
+```bash
+cp .env.example .env
+```
 
 3. **Configure .env** with your credentials:
 
- ```
- MONGO_URI=mongodb://localhost:27017/eshop
- JWT_SECRET=your_secret_key
- CLOUDINARY_NAME=your_cloudinary_name
- CLOUDINARY_API_KEY=your_api_key
- CLOUDINARY_API_SECRET=your_api_secret
- VNPAY_MERCHANT_ID=your_merchant_id
- VNPAY_HASH_SECRET=your_hash_secret
- EMAIL_USER=your_email@gmail.com
- EMAIL_PASSWORD=your_app_password
- PORT=5000
- ```
+```
+MONGO_URI=mongodb://localhost:27017/eshop
+JWT_SECRET=your_secret_key
+CLOUDINARY_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+VNPAY_MERCHANT_ID=your_merchant_id
+VNPAY_HASH_SECRET=your_hash_secret
+EMAIL_USER=your_email@gmail.com
+EMAIL_PASSWORD=your_app_password
+PORT=5000
+```
 
 4. **Start the server**
- ```bash
- npm start
- ```
- Server runs at `http://localhost:5000`
+
+```bash
+npm start
+```
+
+Server runs at `http://localhost:5000`
 
 ### Frontend Setup
 
 1. **Navigate to client directory**
 
- ```bash
- cd client
- npm install
- ```
+```bash
+cd client
+npm install
+```
 
 2. **Create .env file**
 
- ```
- VITE_API_URL=http://localhost:5000
- ```
+```
+VITE_API_URL=http://localhost:5000
+```
 
 3. **Start development server**
- ```bash
- npm run dev
- ```
- Frontend runs at `http://localhost:5173`
+
+```bash
+npm run dev
+```
+
+Frontend runs at `http://localhost:5173`
+
+## Postman
+
+- Import collection: `postman/CNM-Fashion-System-Roles.postman_collection.json`
+- Import environment: `postman/CNM-Fashion-System.local.postman_environment.json`
+- Chọn environment `CNM Fashion System Local`, sau đó chạy một trong ba request: `Login Admin`, `Login Supervisor`, hoặc `Login Employee`
+- Collection sẽ tự lưu `accessToken` và `refreshToken` vào environment để test tiếp `Get My Profile` hoặc `Admin Only - List Users`
 
 ## API Endpoints Summary
 
@@ -289,28 +300,33 @@ client/src/
 ## Security Features
 
 1. **Authentication**
- - JWT with access + refresh tokens
- - Bcrypt password hashing (10 salt rounds)
- - Token refresh on 401 response
+
+- JWT with access + refresh tokens
+- Bcrypt password hashing (10 salt rounds)
+- Token refresh on 401 response
 
 2. **Authorization**
- - Role-based access control (middleware)
- - Protected routes on frontend
- - Protected endpoints on backend
+
+- Role-based access control (middleware)
+- Protected routes on frontend
+- Protected endpoints on backend
 
 3. **Data Validation**
- - Input validation on all endpoints
- - Mongoose schema validation
- - Frontend form validation
+
+- Input validation on all endpoints
+- Mongoose schema validation
+- Frontend form validation
 
 4. **Payment Security**
- - HMAC-SHA512 signature verification for VNPay
- - Callback validation
+
+- HMAC-SHA512 signature verification for VNPay
+- Callback validation
 
 5. **File Upload**
- - File type validation (JPEG, PNG, WebP)
- - Size limit (5MB)
- - Cloudinary storage (not local)
+
+- File type validation (JPEG, PNG, WebP)
+- Size limit (5MB)
+- Cloudinary storage (not local)
 
 ## Common Development Tasks
 
@@ -404,18 +420,18 @@ mongosh mongodb://localhost:27017/eshop
 ## Project Statistics
 
 - **Total Backend Files**: ~35 files
- - 8 domain modules × 5 files each = 40
- - +5 shared utilities
- - +1 central routes
- - = ~46 files
+- 8 domain modules × 5 files each = 40
+- +5 shared utilities
+- +1 central routes
+- = ~46 files
 
 - **Total Frontend Files**: ~35 files
- - 9 domain pages
- - 7 shared components
- - 2 contexts
- - 1 API client
- - Config files (5)
- - = ~24 files
+- 9 domain pages
+- 7 shared components
+- 2 contexts
+- 1 API client
+- Config files (5)
+- = ~24 files
 
 ## Next Steps
 

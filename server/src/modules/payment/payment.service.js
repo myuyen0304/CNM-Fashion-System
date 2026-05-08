@@ -185,6 +185,20 @@ const handleVNPayCallback = async (vnpParams) => {
     throw new ApiError(404, "Không tìm thấy đơn hàng.");
   }
 
+  // Idempotency: nếu order đã ở trạng thái cuối, bỏ qua callback trùng lặp
+  // tránh transaction bị overwrite khi VNPay retry với response code khác
+  const terminalStatuses = [
+    ORDER_STATUS.PAID,
+    ORDER_STATUS.COMPLETED,
+    ORDER_STATUS.CANCELLED,
+  ];
+  if (terminalStatuses.includes(order.status)) {
+    return {
+      success: true,
+      status: order.transaction?.status || TRANSACTION_STATUS.SUCCESS,
+    };
+  }
+
   let transactionStatus = TRANSACTION_STATUS.FAILED;
   let orderStatus = ORDER_STATUS.PENDING;
 

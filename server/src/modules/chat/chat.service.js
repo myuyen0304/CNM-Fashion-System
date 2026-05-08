@@ -178,7 +178,7 @@ const sendMessage = async (customerId, roomId, { content }) => {
         roomId,
         senderRole: "bot",
         content:
-          "Cảm ơn bạn đã xác nhận. Hệ thống sẽ kết thúc phiên chat và lưu trạng thái hoàn tất.Cảm ơn bạn đã xác nhận.",
+          "Cảm ơn bạn đã xác nhận. Hệ thống sẽ kết thúc phiên chat và lưu trạng thái hoàn tất.",
         type: "status",
       });
 
