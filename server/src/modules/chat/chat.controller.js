@@ -8,7 +8,7 @@ const getOrCreateRoom = catchAsync(async (req, res) => {
 
 const sendMessage = catchAsync(async (req, res) => {
   const { roomId } = req.params;
-  const result = await chatService.sendMessage(req.user._id, roomId, req.body);
+  const result = await chatService.sendMessage(req.user._id, roomId, req.body, req.user.name || "");
   res.status(201).json({ success: true, data: result });
 });
 
