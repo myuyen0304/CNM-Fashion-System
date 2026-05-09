@@ -374,14 +374,35 @@ const findActiveByCategories = async (
 /**
  * Tìm sản phẩm tương tự (cùng category, trừ chính nó)
  */
-const findSimilar = async (productId, category, limit = 6) => {
-  return Product.find({
+const findSimilar = async (productId, category, price, limit = 6) => {
+  const SELECT_FIELDS = "name price category images avgRating soldCount stock sizes";
+
+  // Ưu tiên: cùng category + tầm giá ±50%
+  const inRange = await Product.find({
     _id: { $ne: productId },
+    category,
+    status: "active",
+    price: { $gte: price * 0.5, $lte: price * 1.5 },
+  })
+    .sort({ soldCount: -1, avgRating: -1 })
+    .limit(limit)
+    .select(SELECT_FIELDS);
+
+  if (inRange.length >= limit) return inRange;
+
+  // Fallback: cùng category, bất kể giá
+  const remaining = limit - inRange.length;
+  const inRangeIds = inRange.map((p) => p._id);
+  const fallback = await Product.find({
+    _id: { $ne: productId, $nin: inRangeIds },
     category,
     status: "active",
   })
     .sort({ soldCount: -1 })
-    .limit(limit);
+    .limit(remaining)
+    .select(SELECT_FIELDS);
+
+  return [...inRange, ...fallback];
 };
 
 /**

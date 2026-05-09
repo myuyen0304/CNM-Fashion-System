@@ -105,11 +105,11 @@ const getDetail = async (productId) => {
 /**
  * Sản phẩm gợi ý (cùng category)
  */
-const getSimilar = async (productId) => {
+const getSimilar = async (productId, limit = 12) => {
   const product = await productRepo.findById(productId);
   if (!product) throw new ApiError(404, "Không tìm thấy sản phẩm.");
 
-  return productRepo.findSimilar(productId, product.category);
+  return productRepo.findSimilar(productId, product.category, product.price, limit);
 };
 
 const getRecommendations = async ({ userId, currentProductId, limit = 8 }) => {

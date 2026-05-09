@@ -91,7 +91,8 @@ const getProductDetail = catchAsync(async (req, res) => {
 
 // Sản phẩm tương tự
 const getSimilarProducts = catchAsync(async (req, res) => {
-  const products = await productService.getSimilar(req.params.id);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 12, 24);
+  const products = await productService.getSimilar(req.params.id, limit);
   res.json({ success: true, data: products });
 });
 

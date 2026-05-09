@@ -46,7 +46,7 @@ export default function ProductDetailPage() {
 
         const [similarRes, reviewsRes, recommendRes] = await Promise.allSettled(
           [
-            axiosClient.get(`/products/${id}/similar`),
+            axiosClient.get(`/products/${id}/similar?limit=12`),
             axiosClient.get(`/reviews/product/${id}`),
             axiosClient.get(
               token
@@ -275,7 +275,7 @@ export default function ProductDetailPage() {
       {similar.length > 0 && (
         <section>
           <SectionHeading title="Sản phẩm tương tự" className="mb-6" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
             {similar.map((p) => (
               <ProductCard key={p._id} product={p} />
             ))}
