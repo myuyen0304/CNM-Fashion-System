@@ -141,9 +141,36 @@ npm run dev
 - Backend: `http://localhost:5000`
 - Health check: `http://localhost:5000/api/health`
 
+## Truy cập khu vực quản trị
+
+Khu vực quản trị dùng cùng màn hình đăng nhập với người dùng thường tại:
+
+- `http://localhost:5173/login`
+
+Sau khi đăng nhập, quyền truy cập được phân theo role:
+
+- `admin`: vào được ` /staff`, `/staff/orders`, `/staff/support`, `/staff/products`, `/admin/users`
+- `supervisor`: vào được ` /staff`, `/staff/orders`, `/staff/support`, `/staff/products`
+- `employee`: vào được ` /staff`, `/staff/orders`, `/staff/support`
+
+Nếu database chưa có tài khoản staff/admin, tạo bằng script backend:
+
+```bash
+cd server
+npm run create:user -- --name="Admin CNM" --email=admin@example.com --password=StrongPass123 --role=admin
+```
+
+Có thể thay `--role=admin` bằng `supervisor` hoặc `employee`.
+
+Lưu ý:
+
+- Script này sẽ tạo mới hoặc cập nhật user nếu email đã tồn tại.
+- User được tạo qua script sẽ được đặt `isActive = true` và `isVerified = true`.
+- Màn quản lý người dùng chỉ mở cho role `admin`.
+
 ## Chạy bằng Docker
 
-Repository có sẵn `docker-compose.yml` cho môi trường phát triển với MongoDB, API server và Vite client.
+Repository có sẵn `docker-compose.yml` cho môi trường phát triển. Mặc định, container `server` sẽ đọc `MONGO_URI` trực tiếp từ `server/.env`, nên có thể dùng MongoDB Atlas hoặc MongoDB ngoài Docker.
 
 Khởi động:
 
@@ -153,9 +180,18 @@ docker compose up --build
 
 Endpoint mặc định:
 
-- MongoDB: `localhost:27018`
 - Backend: `http://localhost:5000`
 - Frontend: `http://localhost:5173`
+
+Nếu muốn chạy thêm MongoDB local trong Docker thay vì Atlas, dùng profile `local-db`:
+
+```bash
+docker compose --profile local-db up --build
+```
+
+Khi bật profile này, MongoDB local sẽ mở ở:
+
+- MongoDB: `localhost:27018`
 
 Dừng stack:
 

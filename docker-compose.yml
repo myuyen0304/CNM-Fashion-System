@@ -2,6 +2,8 @@ services:
   mongo:
     image: mongo:7
     container_name: cnm-fashion-mongo
+    profiles:
+      - local-db
     restart: unless-stopped
     ports:
       - "27018:27017"
@@ -24,7 +26,6 @@ services:
     env_file:
       - server/.env
     environment:
-      - MONGO_URI=mongodb://mongo:27017/eshop
       - CLIENT_URL=http://localhost:5173
       - NODE_ENV=development
       - TZ=Asia/Ho_Chi_Minh
@@ -33,9 +34,6 @@ services:
     volumes:
       - ./server/src:/app/src
       - /app/node_modules
-    depends_on:
-      mongo:
-        condition: service_healthy
 
   client:
     build:
