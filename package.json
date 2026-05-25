@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "test": "npm run test:server && npm run test:client",
+    "test:client": "npm --prefix client test",
+    "test:server": "npm --prefix server test"
+  },
+  "dependencies": {
+    "express-rate-limit": "^8.4.1"
+  }
+}

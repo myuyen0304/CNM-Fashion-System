@@ -22,6 +22,7 @@ export default function ProductDetailPage() {
   const [reviews, setReviews] = useState([]);
   const [adding, setAdding] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [selectedImage, setSelectedImage] = useState("");
   const { addItem } = useCart();
   const { token } = useAuth();
 
@@ -43,6 +44,7 @@ export default function ProductDetailPage() {
 
         setProduct(currentProduct);
         setSelectedSize(availableSizes[0] || "");
+        setSelectedImage(currentProduct.images?.[0] || "");
 
         const [similarRes, reviewsRes, recommendRes] = await Promise.allSettled(
           [
@@ -148,10 +150,32 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         <div>
           <img
-            src={product.images?.[0] || "/placeholder.jpg"}
+            src={selectedImage || "/placeholder.jpg"}
             alt={product.name}
-            className="w-full rounded-lg"
+            className="w-full rounded-lg object-cover"
           />
+          {product.images?.length > 1 && (
+            <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
+              {product.images.map((img, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setSelectedImage(img)}
+                  className={`flex-shrink-0 w-16 h-16 rounded border-2 overflow-hidden transition-colors ${
+                    selectedImage === img
+                      ? "border-primary"
+                      : "border-transparent hover:border-gray-300"
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`${product.name} ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <h1 className="text-3xl font-bold mb-4">{product.name}</h1>

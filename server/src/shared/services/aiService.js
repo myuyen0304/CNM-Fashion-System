@@ -1,9 +1,23 @@
 const OpenAI = require("openai");
 
-const deepseek = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: "https://api.deepseek.com",
-});
+let deepseekClient;
+
+const getDeepSeekClient = () => {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY is required for chatbot responses.");
+  }
+
+  if (!deepseekClient) {
+    deepseekClient = new OpenAI({
+      apiKey,
+      baseURL: "https://api.deepseek.com",
+    });
+  }
+
+  return deepseekClient;
+};
 
 const MODEL = "deepseek-chat";
 
@@ -97,7 +111,7 @@ const buildMessages = (message, history, productContext, orderContext, customerN
 const claudeChatbotReply = async (message, history = [], productContext = [], orderContext = [], customerName = "") => {
   const messages = buildMessages(message, history, productContext, orderContext, customerName);
 
-  const completion = await deepseek.chat.completions.create({
+  const completion = await getDeepSeekClient().chat.completions.create({
     model: MODEL,
     messages,
   });
@@ -130,7 +144,7 @@ const claudeChatbotReplyStream = async (
 ) => {
   const messages = buildMessages(message, history, productContext, orderContext, customerName);
 
-  const stream = await deepseek.chat.completions.create({
+  const stream = await getDeepSeekClient().chat.completions.create({
     model: MODEL,
     messages,
     stream: true,
