@@ -27,6 +27,8 @@ services:
       - MONGO_URI=mongodb://mongo:27017/eshop
       - CLIENT_URL=http://localhost:5173
       - NODE_ENV=development
+      - TZ=Asia/Ho_Chi_Minh
+      - VNPAY_TIMEZONE=Asia/Ho_Chi_Minh
       - CHOKIDAR_USEPOLLING=true
     volumes:
       - ./server/src:/app/src
