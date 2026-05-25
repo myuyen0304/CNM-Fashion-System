@@ -2,23 +2,36 @@ const mongoose = require("mongoose");
 const { ChatRoom, ChatMessage } = require("./chat.model");
 
 const findOrCreateRoom = async (customerId) => {
-  let room = await ChatRoom.findOne({ customerId, isGuestSession: false });
-  if (!room) {
-    room = await ChatRoom.create({ customerId, isGuestSession: false });
-  }
-  return room;
+  return ChatRoom.findOneAndUpdate(
+    { customerId, isGuestSession: false },
+    {
+      $setOnInsert: {
+        customerId,
+        isGuestSession: false,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+    },
+  );
 };
 
 const findOrCreateGuestRoom = async (guestToken) => {
-  let room = await ChatRoom.findOne({ guestToken, isGuestSession: true });
-  if (!room) {
-    room = await ChatRoom.create({
-      customerId: new mongoose.Types.ObjectId(),
-      isGuestSession: true,
-      guestToken,
-    });
-  }
-  return room;
+  return ChatRoom.findOneAndUpdate(
+    { guestToken, isGuestSession: true },
+    {
+      $setOnInsert: {
+        customerId: new mongoose.Types.ObjectId(),
+        isGuestSession: true,
+        guestToken,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+    },
+  );
 };
 
 const findRoomById = async (roomId) => {

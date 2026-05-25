@@ -83,6 +83,7 @@ export default function ChatWidget() {
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const roomIdRef = useRef(null);
+  const openRef = useRef(open);
 
   const scrollToBottom = () =>
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,6 +101,10 @@ export default function ChatWidget() {
       );
     });
   };
+
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     scrollToBottom();
@@ -145,7 +150,7 @@ export default function ChatWidget() {
         socket.on("newMessage", (message) => {
           if (!mounted) return;
           appendUniqueMessages(message);
-          if (!open) {
+          if (!openRef.current) {
             setUnread((count) => count + 1);
           }
           if (message.type === "auth_required" && !token) {
@@ -200,7 +205,7 @@ export default function ChatWidget() {
         socketRef.current = null;
       }
     };
-  }, [token, open]);
+  }, [token]);
 
   const handleOpen = () => {
     setOpen((prev) => !prev);
