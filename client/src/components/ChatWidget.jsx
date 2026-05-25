@@ -145,7 +145,12 @@ export default function ChatWidget() {
         const socketBase = apiBase.replace(/\/api\/?$/, "");
         const socket = io(socketBase);
         socketRef.current = socket;
-        socket.emit("joinRoom", rid);
+        socket.on("connect", () => {
+          socket.emit("joinRoom", rid);
+        });
+        if (socket.connected) {
+          socket.emit("joinRoom", rid);
+        }
 
         socket.on("newMessage", (message) => {
           if (!mounted) return;

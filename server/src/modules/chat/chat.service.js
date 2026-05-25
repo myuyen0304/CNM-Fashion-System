@@ -47,7 +47,7 @@ const CHAT_PROCESSING_LOCK_TTL_MS = Number(
 const toPlainRoom = (room) => (room?.toObject ? room.toObject() : room);
 
 const emitMessage = (io, roomId, message) => {
-  io.to(roomId).emit("newMessage", {
+  io.to(String(roomId)).emit("newMessage", {
     _id: message._id,
     content: message.content,
     senderRole: message.senderRole,
@@ -361,7 +361,9 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
       }
     }
 
-    io.to(activeRoomId).emit("botStreamStart", { roomId: activeRoomId });
+    io.to(String(activeRoomId)).emit("botStreamStart", {
+      roomId: String(activeRoomId),
+    });
 
     setImmediate(async () => {
       try {
@@ -371,8 +373,8 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
           productContext,
           orderContext,
           (chunk) => {
-            io.to(activeRoomId).emit("botStreamChunk", {
-              roomId: activeRoomId,
+            io.to(String(activeRoomId)).emit("botStreamChunk", {
+              roomId: String(activeRoomId),
               chunk,
             });
           },
@@ -400,8 +402,8 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
                 lastMessage: resolutionPrompt.content,
               });
 
-              io.to(activeRoomId).emit("botStreamEnd", {
-                roomId: activeRoomId,
+              io.to(String(activeRoomId)).emit("botStreamEnd", {
+                roomId: String(activeRoomId),
                 message: {
                   _id: botMessage._id,
                   content: botMessage.content,
@@ -428,8 +430,8 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
               lastMessage: fallbackMessage.content,
             });
 
-            io.to(activeRoomId).emit("botStreamEnd", {
-              roomId: activeRoomId,
+            io.to(String(activeRoomId)).emit("botStreamEnd", {
+              roomId: String(activeRoomId),
               message: null,
             });
             emitMessage(io, activeRoomId, fallbackMessage);
@@ -438,8 +440,8 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
         );
       } catch (error) {
         console.error("[chat.service] Stream error:", error);
-        io.to(activeRoomId).emit("botStreamEnd", {
-          roomId: activeRoomId,
+        io.to(String(activeRoomId)).emit("botStreamEnd", {
+          roomId: String(activeRoomId),
           message: null,
           error: true,
         });
