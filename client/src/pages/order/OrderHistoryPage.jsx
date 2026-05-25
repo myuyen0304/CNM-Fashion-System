@@ -109,7 +109,6 @@ export default function OrderHistoryPage() {
             ))}
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-12">
               <button
