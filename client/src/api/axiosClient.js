@@ -8,6 +8,7 @@ const notifyAuthStateChanged = () => {
 
 const axiosClient = axios.create({
   baseURL: BASE_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -87,20 +88,20 @@ axiosClient.interceptors.response.use(
       };
     }
 
-    const refreshToken = localStorage.getItem("refreshToken");
     const canTryRefresh =
       error.response?.status === 401 &&
       !originalRequest?._retry &&
-      Boolean(refreshToken) &&
       !shouldSkipRefresh(originalRequest?.url);
 
     if (canTryRefresh) {
       originalRequest._retry = true;
 
       try {
-        const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
-          refreshToken,
-        });
+        const response = await axios.post(
+          `${BASE_URL}/auth/refresh-token`,
+          {},
+          { withCredentials: true },
+        );
 
         const { accessToken } = response.data;
         localStorage.setItem("accessToken", accessToken);
@@ -110,7 +111,6 @@ axiosClient.interceptors.response.use(
         return axiosClient(originalRequest);
       } catch (err) {
         localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
         localStorage.removeItem("user");
         notifyAuthStateChanged();
 

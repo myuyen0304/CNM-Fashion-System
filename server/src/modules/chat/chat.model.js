@@ -39,6 +39,18 @@ const chatRoomSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    aiProcessing: {
+      type: Boolean,
+      default: false,
+    },
+    aiProcessingToken: {
+      type: String,
+      default: null,
+    },
+    aiProcessingStartedAt: {
+      type: Date,
+      default: null,
+    },
     updatedAt: {
       type: Date,
       default: Date.now,

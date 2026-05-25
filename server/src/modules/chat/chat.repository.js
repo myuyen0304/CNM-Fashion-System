@@ -140,6 +140,44 @@ const updateRoomStatus = async (roomId, payload) => {
   );
 };
 
+const tryAcquireProcessingLock = async (
+  roomId,
+  lockToken,
+  ttlMs = 2 * 60 * 1000,
+) => {
+  const staleBefore = new Date(Date.now() - ttlMs);
+
+  return ChatRoom.findOneAndUpdate(
+    {
+      _id: roomId,
+      $or: [
+        { aiProcessing: { $ne: true } },
+        { aiProcessingStartedAt: { $lt: staleBefore } },
+      ],
+    },
+    {
+      aiProcessing: true,
+      aiProcessingToken: lockToken,
+      aiProcessingStartedAt: new Date(),
+      updatedAt: new Date(),
+    },
+    { new: true },
+  );
+};
+
+const releaseProcessingLock = async (roomId, lockToken) => {
+  return ChatRoom.findOneAndUpdate(
+    { _id: roomId, aiProcessingToken: lockToken },
+    {
+      aiProcessing: false,
+      aiProcessingToken: null,
+      aiProcessingStartedAt: null,
+      updatedAt: new Date(),
+    },
+    { new: true },
+  );
+};
+
 const getRecentMessages = async (roomId, limit = 10) => {
   return ChatMessage.find({ roomId })
     .sort({ sentAt: -1 })
@@ -162,4 +200,6 @@ module.exports = {
   assignAdminToRoom,
   attachRoomToCustomer,
   updateRoomStatus,
+  tryAcquireProcessingLock,
+  releaseProcessingLock,
 };

@@ -5,6 +5,9 @@ const ApiError = require("../../shared/utils/ApiError");
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const OTP_REGEX = /^\d{6}$/;
+const REFRESH_TOKEN_COOKIE_NAME =
+  process.env.REFRESH_TOKEN_COOKIE_NAME || "refreshToken";
+const DEFAULT_REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const COMMON_DOMAIN_TYPOS = {
   "gmail.co": "gmail.com",
   "gmail.con": "gmail.com",
@@ -17,6 +20,57 @@ const COMMON_DOMAIN_TYPOS = {
 const getTypoSuggestion = (email) => {
   const domain = email.split("@")[1] || "";
   return COMMON_DOMAIN_TYPOS[domain] || "";
+};
+
+const parseDurationToMs = (value) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const normalized = String(value || "").trim().toLowerCase();
+  const match = normalized.match(/^(\d+)(ms|s|m|h|d)?$/);
+
+  if (!match) {
+    return DEFAULT_REFRESH_COOKIE_MAX_AGE_MS;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2] || "ms";
+  const multipliers = {
+    ms: 1,
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+
+  return amount * (multipliers[unit] || 1);
+};
+
+const getRefreshCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "none" : "lax",
+    path: "/api/auth",
+    maxAge: parseDurationToMs(process.env.JWT_REFRESH_EXPIRES_IN),
+  };
+};
+
+const getRefreshTokenFromRequest = (req) => {
+  const cookieHeader = String(req.headers?.cookie || "");
+  const cookieValue = cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${REFRESH_TOKEN_COOKIE_NAME}=`));
+
+  if (cookieValue) {
+    return decodeURIComponent(cookieValue.split("=").slice(1).join("="));
+  }
+
+  return req.body?.refreshToken;
 };
 
 const register = catchAsync(async (req, res) => {
@@ -77,7 +131,13 @@ const login = catchAsync(async (req, res) => {
   }
 
   const result = await authService.login({ email, password });
-  res.json({ success: true, ...result });
+  const { refreshToken, ...responsePayload } = result;
+  res.cookie(
+    REFRESH_TOKEN_COOKIE_NAME,
+    refreshToken,
+    getRefreshCookieOptions(),
+  );
+  res.json({ success: true, ...responsePayload });
 });
 
 const verifyRegistrationOtp = catchAsync(async (req, res) => {
@@ -178,14 +238,27 @@ const resetPassword = catchAsync(async (req, res) => {
 });
 
 const refreshToken = catchAsync(async (req, res) => {
-  const { refreshToken } = req.body;
+  const refreshToken = getRefreshTokenFromRequest(req);
   const result = await authService.refreshAccessToken(refreshToken);
+  if (refreshToken) {
+    res.cookie(
+      REFRESH_TOKEN_COOKIE_NAME,
+      refreshToken,
+      getRefreshCookieOptions(),
+    );
+  }
   res.json({ success: true, ...result });
 });
 
 const logout = catchAsync(async (req, res) => {
-  const { refreshToken } = req.body;
+  const refreshToken = getRefreshTokenFromRequest(req);
   const result = await authService.logout(refreshToken);
+  res.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    path: "/api/auth",
+  });
   res.json({ success: true, ...result });
 });
 

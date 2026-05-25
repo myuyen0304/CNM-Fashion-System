@@ -10,7 +10,6 @@ export const AuthProvider = ({ children }) => {
 
   const clearAuthState = () => {
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);
@@ -74,10 +73,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axiosClient.post("/auth/login", { email, password });
-    const { accessToken, refreshToken, user } = response.data;
+    const { accessToken, user } = response.data;
 
     localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
 
     setToken(accessToken);
     syncUser(user);
@@ -90,15 +88,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
     try {
-      await axiosClient.post("/auth/logout", { refreshToken });
+      await axiosClient.post("/auth/logout");
     } catch (err) {
       console.error("Logout error:", err);
     }
 
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
 
     clearAuthState();
