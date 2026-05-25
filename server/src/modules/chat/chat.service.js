@@ -8,8 +8,6 @@ const orderRepo = require("../order/order.repository");
 const {
   isProductRelated,
   extractProductKeyword,
-  isResolvedResponse,
-  isContinueResponse,
   guestIntentRequiresLogin,
 } = require("./chat.utils");
 
@@ -275,7 +273,6 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
   const normalizedContent = content.trim();
   const requiresAiProcessing =
     !room.adminId &&
-    !room.awaitingResolutionConfirm &&
     !(actor.kind === "guest" && guestIntentRequiresLogin(normalizedContent));
 
   let lockToken = null;
@@ -310,12 +307,11 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
     }
 
     if (room.awaitingResolutionConfirm) {
-      if (isResolvedResponse(normalizedContent)) {
-        return handleResolutionDecision(actor, roomId, true);
-      }
-      if (isContinueResponse(normalizedContent)) {
-        return handleResolutionDecision(actor, roomId, false);
-      }
+      await chatRepo.updateRoomStatus(activeRoomId, {
+        status: "active",
+        awaitingResolutionConfirm: false,
+        resolvedAt: null,
+      });
     }
 
     if (actor.kind === "guest" && guestIntentRequiresLogin(normalizedContent)) {

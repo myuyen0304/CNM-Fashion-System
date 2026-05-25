@@ -5,6 +5,7 @@ import axiosClient from "../api/axiosClient";
 import { useAuth } from "../contexts/AuthContext";
 import {
   buildChatRequestConfig,
+  clearGuestChatSessionToken,
   syncGuestChatSession,
   extractChatMessages,
 } from "../utils/chatSession";
@@ -79,6 +80,7 @@ export default function ChatWidget() {
   const [isTyping, setIsTyping] = useState(false);
   const [unread, setUnread] = useState(0);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [chatReloadKey, setChatReloadKey] = useState(0);
 
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
@@ -210,7 +212,7 @@ export default function ChatWidget() {
         socketRef.current = null;
       }
     };
-  }, [token]);
+  }, [token, chatReloadKey]);
 
   const handleOpen = () => {
     setOpen((prev) => !prev);
@@ -220,6 +222,10 @@ export default function ChatWidget() {
   const sendText = async (text) => {
     if (!text.trim() || !roomId || roomStatus === "closed") return;
     setInput("");
+    if (awaitingConfirm) {
+      setAwaitingConfirm(false);
+      setRoomStatus("active");
+    }
 
     try {
       setSending(true);
@@ -265,6 +271,29 @@ export default function ChatWidget() {
     } finally {
       setSending(false);
     }
+  };
+
+  const startNewChat = () => {
+    if (!token) {
+      clearGuestChatSessionToken();
+    }
+    if (socketRef.current) {
+      if (roomIdRef.current) {
+        socketRef.current.emit("leaveRoom", roomIdRef.current);
+      }
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    roomIdRef.current = null;
+    setRoomId(null);
+    setMessages([]);
+    setInput("");
+    setRoomStatus("active");
+    setAwaitingConfirm(false);
+    setStreamingContent(null);
+    setIsTyping(false);
+    setShowLoginPrompt(false);
+    setChatReloadKey((value) => value + 1);
   };
 
   const goToLogin = () => {
@@ -421,6 +450,18 @@ export default function ChatWidget() {
                   {label}
                 </button>
               ))}
+            </div>
+          )}
+
+          {isClosed && (
+            <div className="px-3 py-2 bg-gray-50 border-t border-gray-100">
+              <button
+                onClick={startNewChat}
+                disabled={sending}
+                className="w-full btn-primary text-xs py-2 disabled:opacity-50"
+              >
+                Tạo phiên chat mới
+              </button>
             </div>
           )}
 
