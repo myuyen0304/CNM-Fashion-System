@@ -41,17 +41,19 @@ const normalizeAuthErrorMessage = (status, requestUrl = "", message = "") => {
     .trim();
 
   const isLoginRequest = String(requestUrl || "").includes("/auth/login");
+  const isUnauthorizedStatus = status === 401;
 
   if (
-    lowered.includes("chua dang nhap") ||
-    lowered.includes("vui long dang nhap") ||
-    lowered.includes("token khong hop le") ||
-    lowered.includes("token da het han")
+    isUnauthorizedStatus &&
+    !isLoginRequest &&
+    (lowered.includes("chua dang nhap") ||
+      lowered.includes("token khong hop le") ||
+      lowered.includes("token da het han"))
   ) {
     return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
   }
 
-  if (status === 401 && !isLoginRequest) {
+  if (isUnauthorizedStatus && !isLoginRequest) {
     return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
   }
 
