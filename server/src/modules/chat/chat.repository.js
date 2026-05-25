@@ -2,36 +2,50 @@ const mongoose = require("mongoose");
 const { ChatRoom, ChatMessage } = require("./chat.model");
 
 const findOrCreateRoom = async (customerId) => {
-  return ChatRoom.findOneAndUpdate(
-    { customerId, isGuestSession: false },
-    {
-      $setOnInsert: {
-        customerId,
-        isGuestSession: false,
+  try {
+    return await ChatRoom.findOneAndUpdate(
+      { customerId, isGuestSession: false },
+      {
+        $setOnInsert: {
+          customerId,
+          isGuestSession: false,
+        },
       },
-    },
-    {
-      new: true,
-      upsert: true,
-    },
-  );
+      {
+        new: true,
+        upsert: true,
+      },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ customerId, isGuestSession: false });
+    }
+    throw error;
+  }
 };
 
 const findOrCreateGuestRoom = async (guestToken) => {
-  return ChatRoom.findOneAndUpdate(
-    { guestToken, isGuestSession: true },
-    {
-      $setOnInsert: {
-        customerId: new mongoose.Types.ObjectId(),
-        isGuestSession: true,
-        guestToken,
+  try {
+    return await ChatRoom.findOneAndUpdate(
+      { guestToken, isGuestSession: true },
+      {
+        $setOnInsert: {
+          customerId: new mongoose.Types.ObjectId(),
+          isGuestSession: true,
+          guestToken,
+        },
       },
-    },
-    {
-      new: true,
-      upsert: true,
-    },
-  );
+      {
+        new: true,
+        upsert: true,
+      },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ guestToken, isGuestSession: true });
+    }
+    throw error;
+  }
 };
 
 const findRoomById = async (roomId) => {
@@ -133,16 +147,23 @@ const assignAdminToRoom = async (roomId, adminId) => {
 };
 
 const attachRoomToCustomer = async (roomId, customerId) => {
-  return ChatRoom.findByIdAndUpdate(
-    roomId,
-    {
-      customerId,
-      isGuestSession: false,
-      guestToken: null,
-      updatedAt: new Date(),
-    },
-    { new: true },
-  );
+  try {
+    return await ChatRoom.findByIdAndUpdate(
+      roomId,
+      {
+        customerId,
+        isGuestSession: false,
+        guestToken: null,
+        updatedAt: new Date(),
+      },
+      { new: true },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ customerId, isGuestSession: false });
+    }
+    throw error;
+  }
 };
 
 const updateRoomStatus = async (roomId, payload) => {

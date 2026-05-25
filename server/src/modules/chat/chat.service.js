@@ -163,6 +163,8 @@ const resolveRoomForActor = async (roomId, actor) => {
     const existingCustomerRoom = await chatRepo.findRoomByCustomer(actor.customerId);
     if (!existingCustomerRoom || String(existingCustomerRoom._id) === String(room._id)) {
       room = await chatRepo.attachRoomToCustomer(room._id, actor.customerId);
+    } else {
+      room = existingCustomerRoom;
     }
   }
 
@@ -199,32 +201,33 @@ const createSystemMessage = async (roomId, content, type = "status") => {
 const handleResolutionDecision = async (actor, roomId, resolved) => {
   const room = await resolveRoomForActor(roomId, actor);
   assertRoomAccess(room, actor);
+  const activeRoomId = room._id;
 
   if (room.status === "closed") {
     throw new ApiError(400, CLOSED_MESSAGE);
   }
 
   const customerMessage = await chatRepo.saveMessage({
-    roomId,
+    roomId: activeRoomId,
     senderId: actor.senderId,
     senderRole: "customer",
     content: resolved ? RESOLVED_LABEL : CONTINUE_LABEL,
   });
 
-  await chatRepo.updateRoomLastMessage(roomId, customerMessage.content);
+  await chatRepo.updateRoomLastMessage(activeRoomId, customerMessage.content);
 
   const io = getIO();
-  emitMessage(io, roomId, customerMessage);
+  emitMessage(io, activeRoomId, customerMessage);
 
   if (resolved) {
     const closingMessage = await chatRepo.saveMessage({
-      roomId,
+      roomId: activeRoomId,
       senderRole: "bot",
       content: RESOLUTION_CLOSING_MESSAGE,
       type: "status",
     });
 
-    await chatRepo.updateRoomStatus(roomId, {
+    await chatRepo.updateRoomStatus(activeRoomId, {
       status: "closed",
       awaitingResolutionConfirm: false,
       resolvedAt: new Date(),
@@ -232,25 +235,25 @@ const handleResolutionDecision = async (actor, roomId, resolved) => {
       lastMessage: closingMessage.content,
     });
 
-    emitMessage(io, roomId, closingMessage);
+    emitMessage(io, activeRoomId, closingMessage);
     return [customerMessage, closingMessage];
   }
 
-  await chatRepo.updateRoomStatus(roomId, {
+  await chatRepo.updateRoomStatus(activeRoomId, {
     status: "active",
     awaitingResolutionConfirm: false,
     resolvedAt: null,
   });
 
   const continueMessage = await chatRepo.saveMessage({
-    roomId,
+    roomId: activeRoomId,
     senderRole: "bot",
     content: CONTINUE_SUPPORT_MESSAGE,
     type: "status",
   });
 
-  await chatRepo.updateRoomLastMessage(roomId, continueMessage.content);
-  emitMessage(io, roomId, continueMessage);
+  await chatRepo.updateRoomLastMessage(activeRoomId, continueMessage.content);
+  emitMessage(io, activeRoomId, continueMessage);
   return [customerMessage, continueMessage];
 };
 
@@ -263,6 +266,7 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
 
   const room = await resolveRoomForActor(roomId, actor);
   assertRoomAccess(room, actor);
+  const activeRoomId = room._id;
 
   if (room.status === "closed") {
     throw new ApiError(400, CLOSED_MESSAGE);
@@ -278,7 +282,7 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
   if (requiresAiProcessing) {
     lockToken = randomUUID();
     const lockedRoom = await chatRepo.tryAcquireProcessingLock(
-      roomId,
+      activeRoomId,
       lockToken,
       CHAT_PROCESSING_LOCK_TTL_MS,
     );
@@ -290,16 +294,16 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
 
   try {
     const customerMessage = await chatRepo.saveMessage({
-      roomId,
+      roomId: activeRoomId,
       senderId: actor.senderId,
       senderRole: "customer",
       content: normalizedContent,
     });
 
-    await chatRepo.updateRoomLastMessage(roomId, normalizedContent);
+    await chatRepo.updateRoomLastMessage(activeRoomId, normalizedContent);
 
     const io = getIO();
-    emitMessage(io, roomId, customerMessage);
+    emitMessage(io, activeRoomId, customerMessage);
 
     if (room.adminId) {
       return customerMessage;
@@ -316,18 +320,18 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
 
     if (actor.kind === "guest" && guestIntentRequiresLogin(normalizedContent)) {
       const loginMessage = await createSystemMessage(
-        roomId,
+        activeRoomId,
         GUEST_LOGIN_PROMPT,
         "auth_required",
       );
-      emitMessage(io, roomId, loginMessage);
+      emitMessage(io, activeRoomId, loginMessage);
       return {
         messages: [customerMessage, loginMessage],
         requiresLogin: true,
       };
     }
 
-    const recentMessages = await chatRepo.getRecentMessages(roomId, 12);
+    const recentMessages = await chatRepo.getRecentMessages(activeRoomId, 12);
     const history = recentMessages
       .reverse()
       .filter((message) => message._id.toString() !== customerMessage._id.toString());
@@ -357,7 +361,7 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
       }
     }
 
-    io.to(roomId).emit("botStreamStart", { roomId });
+    io.to(activeRoomId).emit("botStreamStart", { roomId: activeRoomId });
 
     setImmediate(async () => {
       try {
@@ -367,25 +371,28 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
           productContext,
           orderContext,
           (chunk) => {
-            io.to(roomId).emit("botStreamChunk", { roomId, chunk });
+            io.to(activeRoomId).emit("botStreamChunk", {
+              roomId: activeRoomId,
+              chunk,
+            });
           },
           async (fullText) => {
             if (fullText) {
               const botMessage = await chatRepo.saveMessage({
-                roomId,
+                roomId: activeRoomId,
                 senderId: null,
                 senderRole: "bot",
                 content: fullText,
               });
 
               const resolutionPrompt = await chatRepo.saveMessage({
-                roomId,
+                roomId: activeRoomId,
                 senderRole: "bot",
                 content: RESOLUTION_PROMPT,
                 type: "status",
               });
 
-              await chatRepo.updateRoomStatus(roomId, {
+              await chatRepo.updateRoomStatus(activeRoomId, {
                 status: "resolved",
                 awaitingResolutionConfirm: true,
                 resolvedAt: new Date(),
@@ -393,8 +400,8 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
                 lastMessage: resolutionPrompt.content,
               });
 
-              io.to(roomId).emit("botStreamEnd", {
-                roomId,
+              io.to(activeRoomId).emit("botStreamEnd", {
+                roomId: activeRoomId,
                 message: {
                   _id: botMessage._id,
                   content: botMessage.content,
@@ -404,38 +411,41 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
                 },
               });
 
-              emitMessage(io, roomId, resolutionPrompt);
+              emitMessage(io, activeRoomId, resolutionPrompt);
               return;
             }
 
             const fallbackMessage = await createSystemMessage(
-              roomId,
+              activeRoomId,
               actor.kind === "guest" ? GUEST_HANDOFF_PROMPT : AUTH_USER_HANDOFF_PROMPT,
               actor.kind === "guest" ? "auth_required" : "status",
             );
 
-            await chatRepo.updateRoomStatus(roomId, {
+            await chatRepo.updateRoomStatus(activeRoomId, {
               status: "active",
               awaitingResolutionConfirm: false,
               resolvedAt: null,
               lastMessage: fallbackMessage.content,
             });
 
-            io.to(roomId).emit("botStreamEnd", { roomId, message: null });
-            emitMessage(io, roomId, fallbackMessage);
+            io.to(activeRoomId).emit("botStreamEnd", {
+              roomId: activeRoomId,
+              message: null,
+            });
+            emitMessage(io, activeRoomId, fallbackMessage);
           },
           actor.customerName,
         );
       } catch (error) {
         console.error("[chat.service] Stream error:", error);
-        io.to(roomId).emit("botStreamEnd", {
-          roomId,
+        io.to(activeRoomId).emit("botStreamEnd", {
+          roomId: activeRoomId,
           message: null,
           error: true,
         });
       } finally {
         if (lockToken) {
-          await chatRepo.releaseProcessingLock(roomId, lockToken);
+          await chatRepo.releaseProcessingLock(activeRoomId, lockToken);
         }
       }
     });
@@ -443,7 +453,7 @@ const sendMessage = async (actorPayload, roomId, { content }) => {
     return customerMessage;
   } catch (error) {
     if (lockToken) {
-      await chatRepo.releaseProcessingLock(roomId, lockToken);
+      await chatRepo.releaseProcessingLock(activeRoomId, lockToken);
     }
     throw error;
   }
