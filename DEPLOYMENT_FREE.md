@@ -26,6 +26,8 @@ Use the root `render.yaml` blueprint, or create a Web Service manually:
 - Build command: `npm ci`
 - Start command: `npm start`
 - Health check path: `/api/health`
+- Branch: `main` (or the branch you want to publish)
+- Auto deploy: `On`
 
 Required Render environment variables:
 
@@ -62,6 +64,12 @@ After Render deploys, test:
 https://<your-render-service>.onrender.com/api/health
 ```
 
+Notes:
+
+- `CLIENT_URL` must match the exact Vercel frontend origin that users open in the browser.
+- This app uses cross-site refresh token cookies, so both frontend and backend should stay on HTTPS in production.
+- Cloudinary is strongly recommended in production. If Cloudinary is missing, avatar uploads fall back to local files and generated URLs may not be suitable for internet-facing hosting.
+
 ## 3. Deploy Frontend To Vercel
 
 Create a Vercel project from the same repository:
@@ -70,6 +78,8 @@ Create a Vercel project from the same repository:
 - Framework preset: `Vite`
 - Build command: `npm run build`
 - Output directory: `dist`
+- Install command: `npm ci`
+- Production branch: `main` (or the branch you want to publish)
 
 Set this Vercel environment variable:
 
@@ -88,7 +98,26 @@ After both services exist:
 3. In Render, set `VNPAY_RETURN_URL` to the Render backend callback URL.
 4. Redeploy both services.
 
-## 5. Limitations On Free Tiers
+Recommended order:
+
+1. Deploy the backend on Render first.
+2. Copy the Render service URL.
+3. Create the Vercel project and set `VITE_API_URL` with the Render URL ending in `/api`.
+4. After Vercel gives you the frontend URL, paste it back into Render as `CLIENT_URL`.
+5. Redeploy Render so CORS, email verification links, and payment redirects use the correct frontend domain.
+
+## 5. Post-Deploy Smoke Test
+
+Check these flows after both deployments are live:
+
+1. Open the Vercel site and confirm the storefront loads without a blank page.
+2. Call `GET https://<your-render-service>.onrender.com/api/health`.
+3. Register a new account and confirm OTP or verification email still works.
+4. Log in, refresh the page, and confirm the session survives page reload.
+5. Open chat and confirm requests reach the backend.
+6. Start a VNPay sandbox payment and verify the callback returns to the frontend result page.
+
+## 6. Limitations On Free Tiers
 
 - Render free web services can sleep when idle, so the first request after inactivity may be slow.
 - Vite requires `VITE_API_URL` during build, so changing it needs a Vercel redeploy.
