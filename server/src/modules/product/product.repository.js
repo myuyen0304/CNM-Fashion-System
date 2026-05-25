@@ -61,8 +61,14 @@ const listActiveCategories = async () => {
     .sort((a, b) => a.localeCompare(b, "vi"));
 };
 
-const findById = async (id) => {
-  return Product.findById(id);
+const findById = async (id, options = {}) => {
+  let query = Product.findById(id);
+
+  if (options.session) {
+    query = query.session(options.session);
+  }
+
+  return query;
 };
 
 const findPopular = async (page = 1, limit = 40) => {
@@ -431,21 +437,25 @@ const updateAvgRating = async (productId, avgRating) => {
 /**
  * Giảm stock sau khi đặt hàng
  */
-const decreaseStock = async (productId, quantity) => {
+const decreaseStock = async (productId, quantity, options = {}) => {
   return Product.findOneAndUpdate(
     { _id: productId, stock: { $gte: quantity } },
     { $inc: { stock: -quantity, soldCount: quantity } },
-    { new: true },
+    { new: true, session: options.session },
   );
 };
 
 /**
  * Tăng stock khi hủy đơn
  */
-const increaseStock = async (productId, quantity) => {
-  return Product.findByIdAndUpdate(productId, {
-    $inc: { stock: quantity, soldCount: -quantity },
-  });
+const increaseStock = async (productId, quantity, options = {}) => {
+  return Product.findByIdAndUpdate(
+    productId,
+    {
+      $inc: { stock: quantity, soldCount: -quantity },
+    },
+    { session: options.session },
+  );
 };
 
 // ========================

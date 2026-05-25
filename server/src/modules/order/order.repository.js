@@ -2,13 +2,27 @@
 const mongoose = require("mongoose");
 const { ORDER_STATUS } = require("../../shared/constants");
 
-const createOrder = async (orderData) => {
+const createOrder = async (orderData, options = {}) => {
   const order = new Order(orderData);
-  return order.save();
+  return order.save(options.session ? { session: options.session } : undefined);
 };
 
-const findOrderById = async (id) => {
-  return Order.findById(id).populate("customerId", "name email phone role");
+const saveOrder = async (order, options = {}) => {
+  return order.save(options.session ? { session: options.session } : undefined);
+};
+
+const findOrderById = async (id, options = {}) => {
+  let query = Order.findById(id);
+
+  if (options.populateCustomer !== false) {
+    query = query.populate("customerId", "name email phone role");
+  }
+
+  if (options.session) {
+    query = query.session(options.session);
+  }
+
+  return query;
 };
 
 const findOrdersByCustomer = async (customerId, page = 1, limit = 10) => {
@@ -56,20 +70,32 @@ const findAllOrders = async ({
   };
 };
 
-const updateOrderStatus = async (orderId, status) => {
-  return Order.findByIdAndUpdate(orderId, { status }, { new: true });
+const updateOrderStatus = async (orderId, status, options = {}) => {
+  return Order.findByIdAndUpdate(
+    orderId,
+    { status },
+    { new: true, session: options.session },
+  );
 };
 
-const updateTransaction = async (orderId, transactionData) => {
+const updateTransaction = async (orderId, transactionData, options = {}) => {
   const sets = {};
   for (const key of Object.keys(transactionData)) {
     sets[`transaction.${key}`] = transactionData[key];
   }
-  return Order.findByIdAndUpdate(orderId, { $set: sets }, { new: true });
+  return Order.findByIdAndUpdate(
+    orderId,
+    { $set: sets },
+    { new: true, session: options.session },
+  );
 };
 
-const updateReturnRequest = async (orderId, returnRequest) => {
-  return Order.findByIdAndUpdate(orderId, { returnRequest }, { new: true });
+const updateReturnRequest = async (orderId, returnRequest, options = {}) => {
+  return Order.findByIdAndUpdate(
+    orderId,
+    { returnRequest },
+    { new: true, session: options.session },
+  );
 };
 
 const findOrderByTransactionId = async (transactionId) => {
@@ -169,6 +195,7 @@ const aggregateCoPurchasedProducts = async (
 
 module.exports = {
   createOrder,
+  saveOrder,
   findOrderById,
   findOrdersByCustomer,
   findAllOrders,

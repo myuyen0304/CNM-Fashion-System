@@ -2,6 +2,7 @@ services:
   mongo:
     image: mongo:7
     container_name: cnm-fashion-mongo
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     profiles:
       - local-db
     restart: unless-stopped
@@ -10,7 +11,11 @@ services:
     volumes:
       - mongo-data:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      test:
+        [
+          "CMD-SHELL",
+          "echo 'try { rs.status().ok } catch (e) { rs.initiate({_id:\"rs0\",members:[{_id:0,host:\"mongo:27017\"}]}); rs.status().ok }' | mongosh --quiet | grep 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -27,6 +32,7 @@ services:
       - server/.env
     environment:
       - CLIENT_URL=http://localhost:5173
+      - MONGO_URI=mongodb://mongo:27017/eshop?replicaSet=rs0
       - NODE_ENV=development
       - TZ=Asia/Ho_Chi_Minh
       - VNPAY_TIMEZONE=Asia/Ho_Chi_Minh
@@ -34,6 +40,9 @@ services:
     volumes:
       - ./server/src:/app/src
       - /app/node_modules
+    depends_on:
+      mongo:
+        condition: service_healthy
 
   client:
     build:

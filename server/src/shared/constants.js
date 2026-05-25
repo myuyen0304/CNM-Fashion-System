@@ -32,6 +32,11 @@ const RETURN_STATUS = {
   COMPLETED: "completed",
 };
 
+const INVENTORY_STATUS = {
+  RESERVED: "reserved",
+  RELEASED: "released",
+};
+
 // Payment methods
 const PAYMENT_METHODS = {
   VNPAY: "VNPay",
@@ -63,6 +68,7 @@ module.exports = {
   ORDER_STATUS,
   TRANSACTION_STATUS,
   RETURN_STATUS,
+  INVENTORY_STATUS,
   PAYMENT_METHODS,
   SHIPPING_METHODS,
   PRODUCT_STATUS,

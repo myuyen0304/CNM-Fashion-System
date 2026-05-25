@@ -4,6 +4,7 @@ const {
   TRANSACTION_STATUS,
   PAYMENT_METHODS,
   RETURN_STATUS,
+  INVENTORY_STATUS,
 } = require("../../shared/constants");
 
 const orderItemSchema = new mongoose.Schema({
@@ -72,6 +73,25 @@ const returnRequestSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const inventorySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      enum: Object.values(INVENTORY_STATUS),
+      default: INVENTORY_STATUS.RESERVED,
+    },
+    releasedReason: {
+      type: String,
+      default: "",
+    },
+    releasedAt: {
+      type: Date,
+      default: null,
+    },
+  },
+  { _id: false },
+);
+
 const orderSchema = new mongoose.Schema(
   {
     customerId: {
@@ -122,6 +142,10 @@ const orderSchema = new mongoose.Schema(
     returnRequest: {
       type: returnRequestSchema,
       default: () => ({ status: RETURN_STATUS.NONE }),
+    },
+    inventory: {
+      type: inventorySchema,
+      default: () => ({ status: INVENTORY_STATUS.RESERVED }),
     },
   },
   { timestamps: true },
