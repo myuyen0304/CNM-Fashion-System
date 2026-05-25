@@ -1,46 +1,32 @@
+const { randomUUID } = require("crypto");
 const ApiError = require("../../shared/utils/ApiError");
 const { claudeChatbotReplyStream } = require("../../shared/services/aiService");
 const { getIO } = require("../../config/socket");
 const chatRepo = require("./chat.repository");
 const productRepo = require("../product/product.repository");
 const orderRepo = require("../order/order.repository");
+const {
+  isProductRelated,
+  extractProductKeyword,
+  isResolvedResponse,
+  isContinueResponse,
+  guestIntentRequiresLogin,
+} = require("./chat.utils");
 
-const PRODUCT_INTENT_KEYWORDS = [
-  "mua", "tìm", "tìm kiếm", "gợi ý", "giới thiệu", "cần", "muốn",
-  "sản phẩm", "áo", "quần", "váy", "đầm", "giày", "dép", "túi",
-  "phụ kiện", "hàng", "loại", "có bán", "bán không", "còn không",
-  "giá", "rẻ", "sale", "khuyến mãi",
-];
+const WELCOME_MESSAGE =
+  "Xin chào! Tôi có thể hỗ trợ sản phẩm, size, giá và chính sách cho bạn.";
+const CLOSED_MESSAGE =
+  "Phiên chat đã kết thúc. Vui lòng mở phiên chat mới để tiếp tục.";
+const GUEST_LOGIN_PROMPT =
+  "Bạn có thể hỏi về sản phẩm và chính sách ngay trong khung chat này. Để kiểm tra đơn hàng, đổi trả, thanh toán hoặc tài khoản của riêng bạn, vui lòng đăng nhập.";
+const GUEST_HANDOFF_PROMPT =
+  "Nội dung này cần tài khoản để tiếp tục với nhân viên hỗ trợ. Vui lòng đăng nhập nếu bạn muốn xử lý đơn hàng, đổi trả hoặc thông tin cá nhân.";
+const AUTH_USER_HANDOFF_PROMPT =
+  "Chatbot AI chưa tìm được câu trả lời phù hợp. Hệ thống sẽ chuyển yêu cầu đến nhân viên hỗ trợ.";
 
-const isProductRelated = (message) => {
-  const msg = message.toLowerCase();
-  return PRODUCT_INTENT_KEYWORDS.some((kw) => msg.includes(kw));
-};
+const processingRooms = new Set();
 
-const extractProductKeyword = (message) => {
-  const stopWords = [
-    "tôi", "mình", "bạn", "ơi", "nhé", "không", "có", "và", "với",
-    "cho", "của", "được", "một", "những", "các", "là", "ở", "thì",
-    "mua", "tìm", "cần", "muốn", "gợi ý", "giới thiệu",
-  ];
-  const words = message
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 1 && !stopWords.includes(w));
-  return words.slice(0, 4).join(" ") || message.slice(0, 30);
-};
-
-const RESOLVED_KEYWORDS = [
-  "da giai quyet", "đã giải quyết", "ok", "ổn", "cam on",
-  "cảm ơn", "yes", "roi", "rồi",
-];
-
-const CONTINUE_KEYWORDS = [
-  "chua", "chưa", "chua giai quyet", "chưa giải quyết",
-  "hoi tiep", "hỏi tiếp", "them", "thêm", "no", "khong", "không",
-];
-
-const normalizeText = (value) => String(value || "").toLowerCase().trim();
+const toPlainRoom = (room) => (room?.toObject ? room.toObject() : room);
 
 const emitMessage = (io, roomId, message) => {
   io.to(roomId).emit("newMessage", {
@@ -52,18 +38,34 @@ const emitMessage = (io, roomId, message) => {
   });
 };
 
-// In-memory lock: roomIds currently being processed by AI
-const processingRooms = new Set();
+const buildActor = ({ user, guestToken }) => {
+  if (user?._id) {
+    return {
+      kind: "authenticated",
+      customerId: user._id,
+      customerName: user.name || "",
+      guestToken: guestToken || "",
+      senderId: user._id,
+    };
+  }
 
-/**
- * UC-11: Chat
- */
+  if (!guestToken) {
+    throw new ApiError(400, "Phiên chat của khách vãng lai chưa được khởi tạo.");
+  }
 
-const getOrCreateRoom = async (customerId) => {
-  const room = await chatRepo.findOrCreateRoom(customerId);
+  return {
+    kind: "guest",
+    guestToken,
+    customerName: "",
+    senderId: null,
+  };
+};
 
-  if (room.status === "closed") {
-    await chatRepo.updateRoomStatus(room._id, {
+const ensureRoomReady = async (room) => {
+  let currentRoom = room;
+
+  if (currentRoom.status === "closed") {
+    currentRoom = await chatRepo.updateRoomStatus(currentRoom._id, {
       status: "active",
       adminId: null,
       awaitingResolutionConfirm: false,
@@ -71,46 +73,181 @@ const getOrCreateRoom = async (customerId) => {
       closedAt: null,
       lastMessage: null,
     });
+
     const welcome = await chatRepo.saveMessage({
-      roomId: room._id,
+      roomId: currentRoom._id,
       senderRole: "bot",
-      content: "Xin chào! Tôi có thể giúp gì cho bạn?",
+      content: WELCOME_MESSAGE,
       type: "status",
     });
-    await chatRepo.updateRoomLastMessage(room._id, welcome.content);
-    return { ...room.toObject(), status: "active" };
+    await chatRepo.updateRoomLastMessage(currentRoom._id, welcome.content);
+    return currentRoom;
   }
 
-  const messageCount = await chatRepo.countMessages(room._id);
+  const messageCount = await chatRepo.countMessages(currentRoom._id);
   if (messageCount === 0) {
     const welcome = await chatRepo.saveMessage({
-      roomId: room._id,
+      roomId: currentRoom._id,
       senderRole: "bot",
-      content: "Xin chào! Tôi có thể giúp gì cho bạn?",
+      content: WELCOME_MESSAGE,
       type: "status",
     });
-    await chatRepo.updateRoomLastMessage(room._id, welcome.content);
+    await chatRepo.updateRoomLastMessage(currentRoom._id, welcome.content);
+  }
+
+  return currentRoom;
+};
+
+const buildRoomResponse = (room) => {
+  const plainRoom = toPlainRoom(room);
+  return plainRoom.isGuestSession
+    ? { ...plainRoom, guestSessionToken: plainRoom.guestToken }
+    : plainRoom;
+};
+
+const getOrCreateRoom = async ({ user, guestToken }) => {
+  let room;
+
+  if (user?._id) {
+    room = await chatRepo.findRoomByCustomer(user._id);
+
+    if (!room && guestToken) {
+      const guestRoom = await chatRepo.findRoomByGuestToken(guestToken);
+      if (guestRoom) {
+        room = await chatRepo.attachRoomToCustomer(guestRoom._id, user._id);
+      }
+    }
+
+    if (!room) {
+      room = await chatRepo.findOrCreateRoom(user._id);
+    }
+  } else {
+    const sessionToken = guestToken || randomUUID();
+    room = await chatRepo.findOrCreateGuestRoom(sessionToken);
+  }
+
+  const readyRoom = await ensureRoomReady(room);
+  return buildRoomResponse(readyRoom);
+};
+
+const resolveRoomForActor = async (roomId, actor) => {
+  let room = await chatRepo.findRoomById(roomId);
+  if (!room) {
+    throw new ApiError(404, "Không tìm thấy phòng chat.");
+  }
+
+  if (
+    actor.kind === "authenticated" &&
+    room.isGuestSession &&
+    actor.guestToken &&
+    room.guestToken === actor.guestToken
+  ) {
+    const existingCustomerRoom = await chatRepo.findRoomByCustomer(actor.customerId);
+    if (!existingCustomerRoom || String(existingCustomerRoom._id) === String(room._id)) {
+      room = await chatRepo.attachRoomToCustomer(room._id, actor.customerId);
+    }
   }
 
   return room;
 };
 
-const sendMessage = async (customerId, roomId, { content }, customerName = "") => {
+const assertRoomAccess = (room, actor) => {
+  if (room.isGuestSession) {
+    if (!actor.guestToken || room.guestToken !== actor.guestToken) {
+      throw new ApiError(403, "Bạn không có quyền truy cập phòng chat này.");
+    }
+    return;
+  }
+
+  if (
+    actor.kind !== "authenticated" ||
+    room.customerId.toString() !== actor.customerId.toString()
+  ) {
+    throw new ApiError(403, "Bạn không có quyền truy cập phòng chat này.");
+  }
+};
+
+const createSystemMessage = async (roomId, content, type = "status") => {
+  const message = await chatRepo.saveMessage({
+    roomId,
+    senderRole: "system",
+    content,
+    type,
+  });
+  await chatRepo.updateRoomLastMessage(roomId, message.content);
+  return message;
+};
+
+const handleResolutionDecision = async (actor, roomId, resolved) => {
+  const room = await resolveRoomForActor(roomId, actor);
+  assertRoomAccess(room, actor);
+
+  if (room.status === "closed") {
+    throw new ApiError(400, CLOSED_MESSAGE);
+  }
+
+  const customerMessage = await chatRepo.saveMessage({
+    roomId,
+    senderId: actor.senderId,
+    senderRole: "customer",
+    content: resolved ? "Đã giải quyết" : "Hỏi thêm",
+  });
+
+  await chatRepo.updateRoomLastMessage(roomId, customerMessage.content);
+
+  const io = getIO();
+  emitMessage(io, roomId, customerMessage);
+
+  if (resolved) {
+    const closingMessage = await chatRepo.saveMessage({
+      roomId,
+      senderRole: "bot",
+      content: "Cảm ơn bạn đã xác nhận. Hệ thống sẽ kết thúc phiên chat.",
+      type: "status",
+    });
+
+    await chatRepo.updateRoomStatus(roomId, {
+      status: "closed",
+      awaitingResolutionConfirm: false,
+      resolvedAt: new Date(),
+      closedAt: new Date(),
+      lastMessage: closingMessage.content,
+    });
+
+    emitMessage(io, roomId, closingMessage);
+    return [customerMessage, closingMessage];
+  }
+
+  await chatRepo.updateRoomStatus(roomId, {
+    status: "active",
+    awaitingResolutionConfirm: false,
+    resolvedAt: null,
+  });
+
+  const continueMessage = await chatRepo.saveMessage({
+    roomId,
+    senderRole: "bot",
+    content: "Mình đã ghi nhận bạn cần hỗ trợ thêm. Bạn hãy mô tả chi tiết hơn để chatbot tiếp tục xử lý.",
+    type: "status",
+  });
+
+  await chatRepo.updateRoomLastMessage(roomId, continueMessage.content);
+  emitMessage(io, roomId, continueMessage);
+  return [customerMessage, continueMessage];
+};
+
+const sendMessage = async (actorPayload, roomId, { content }) => {
+  const actor = buildActor(actorPayload);
+
   if (!content || !content.trim()) {
     throw new ApiError(400, "Nội dung tin nhắn không được để trống.");
   }
 
-  const room = await chatRepo.findRoomById(roomId);
-  if (!room) {
-    throw new ApiError(404, "Không tìm thấy phòng chat.");
-  }
+  const room = await resolveRoomForActor(roomId, actor);
+  assertRoomAccess(room, actor);
 
   if (room.status === "closed") {
-    throw new ApiError(400, "Phiên chat đã kết thúc. Vui lòng mở phiên chat mới để tiếp tục.");
-  }
-
-  if (room.customerId.toString() !== customerId.toString()) {
-    throw new ApiError(403, "Bạn không có quyền gửi tin nhắn trong phòng này.");
+    throw new ApiError(400, CLOSED_MESSAGE);
   }
 
   if (processingRooms.has(roomId.toString())) {
@@ -121,7 +258,7 @@ const sendMessage = async (customerId, roomId, { content }, customerName = "") =
 
   const customerMessage = await chatRepo.saveMessage({
     roomId,
-    senderId: customerId,
+    senderId: actor.senderId,
     senderRole: "customer",
     content: normalizedContent,
   });
@@ -131,61 +268,36 @@ const sendMessage = async (customerId, roomId, { content }, customerName = "") =
   const io = getIO();
   emitMessage(io, roomId, customerMessage);
 
-  // Admin đang phụ trách → chờ admin reply
   if (room.adminId) {
     return customerMessage;
   }
 
-  // Đang chờ xác nhận giải quyết
   if (room.awaitingResolutionConfirm) {
-    const normalized = normalizeText(normalizedContent);
-    const isResolved = RESOLVED_KEYWORDS.some((kw) => normalized.includes(kw));
-    const wantsContinue = CONTINUE_KEYWORDS.some((kw) => normalized.includes(kw));
-
-    if (isResolved) {
-      const closingMessage = await chatRepo.saveMessage({
-        roomId,
-        senderRole: "bot",
-        content: "Cảm ơn bạn đã xác nhận. Hệ thống sẽ kết thúc phiên chat và lưu trạng thái hoàn tất.",
-        type: "status",
-      });
-
-      await chatRepo.updateRoomStatus(roomId, {
-        status: "closed",
-        awaitingResolutionConfirm: false,
-        resolvedAt: new Date(),
-        closedAt: new Date(),
-        lastMessage: closingMessage.content,
-      });
-
-      emitMessage(io, roomId, closingMessage);
-      return [customerMessage, closingMessage];
+    if (isResolvedResponse(normalizedContent)) {
+      return handleResolutionDecision(actor, roomId, true);
     }
-
-    if (wantsContinue) {
-      await chatRepo.updateRoomStatus(roomId, {
-        status: "active",
-        awaitingResolutionConfirm: false,
-        resolvedAt: null,
-      });
-
-      const continueMessage = await chatRepo.saveMessage({
-        roomId,
-        senderRole: "bot",
-        content: "Mình đã ghi nhận bạn cần hỗ trợ thêm. Bạn hãy mô tả chi tiết vấn đề, chatbot AI sẽ tiếp tục xử lý.",
-        type: "status",
-      });
-      await chatRepo.updateRoomLastMessage(roomId, continueMessage.content);
-      emitMessage(io, roomId, continueMessage);
-      return [customerMessage, continueMessage];
+    if (isContinueResponse(normalizedContent)) {
+      return handleResolutionDecision(actor, roomId, false);
     }
   }
 
-  // Bot xử lý (streaming)
+  if (actor.kind === "guest" && guestIntentRequiresLogin(normalizedContent)) {
+    const loginMessage = await createSystemMessage(
+      roomId,
+      GUEST_LOGIN_PROMPT,
+      "auth_required",
+    );
+    emitMessage(io, roomId, loginMessage);
+    return {
+      messages: [customerMessage, loginMessage],
+      requiresLogin: true,
+    };
+  }
+
   const recentMessages = await chatRepo.getRecentMessages(roomId, 12);
-  const history = recentMessages.reverse().filter(
-    (m) => m._id.toString() !== customerMessage._id.toString(),
-  );
+  const history = recentMessages
+    .reverse()
+    .filter((message) => message._id.toString() !== customerMessage._id.toString());
 
   let productContext = [];
   if (isProductRelated(normalizedContent)) {
@@ -194,30 +306,28 @@ const sendMessage = async (customerId, roomId, { content }, customerName = "") =
       const result = await productRepo.findByKeyword(keyword, {}, 1, 4);
       productContext = result.products || [];
       if (productContext.length === 0) {
-        const popular = await productRepo.findPopular(1, 4);
-        productContext = popular.products || [];
+        const fallback = await productRepo.findPopular(1, 4);
+        productContext = fallback.products || [];
       }
     } catch (_) {
-      // Bỏ qua lỗi search
+      productContext = [];
     }
   }
 
   let orderContext = [];
-  try {
-    const result = await orderRepo.findOrdersByCustomer(customerId, 1, 5);
-    orderContext = result.orders || [];
-  } catch (_) {
-    // Bỏ qua lỗi
+  if (actor.kind === "authenticated") {
+    try {
+      const result = await orderRepo.findOrdersByCustomer(actor.customerId, 1, 5);
+      orderContext = result.orders || [];
+    } catch (_) {
+      orderContext = [];
+    }
   }
 
-  // Lock room trong lúc AI đang stream
   const roomIdStr = roomId.toString();
   processingRooms.add(roomIdStr);
-
-  // Emit signal bắt đầu stream (tạo placeholder message ở FE)
   io.to(roomId).emit("botStreamStart", { roomId });
 
-  // Chạy streaming bất đồng bộ (không block HTTP response)
   setImmediate(async () => {
     try {
       await claudeChatbotReplyStream(
@@ -230,7 +340,6 @@ const sendMessage = async (customerId, roomId, { content }, customerName = "") =
         },
         async (fullText) => {
           if (fullText) {
-            // Bot trả lời được
             const botMessage = await chatRepo.saveMessage({
               roomId,
               senderId: null,
@@ -259,36 +368,40 @@ const sendMessage = async (customerId, roomId, { content }, customerName = "") =
                 _id: botMessage._id,
                 content: botMessage.content,
                 senderRole: botMessage.senderRole,
+                type: botMessage.type,
                 sentAt: botMessage.sentAt,
               },
             });
 
             emitMessage(io, roomId, resolutionPrompt);
-          } else {
-            // Bot không trả lời được → chuyển admin
-            const transferMessage = await chatRepo.saveMessage({
-              roomId,
-              senderRole: "system",
-              content: "Chatbot AI chưa tìm được câu trả lời phù hợp. Hệ thống đã ghi nhận và sẽ chuyển yêu cầu đến nhân viên hỗ trợ.",
-              type: "status",
-            });
-
-            await chatRepo.updateRoomStatus(roomId, {
-              status: "active",
-              awaitingResolutionConfirm: false,
-              resolvedAt: null,
-              lastMessage: transferMessage.content,
-            });
-
-            io.to(roomId).emit("botStreamEnd", { roomId, message: null });
-            emitMessage(io, roomId, transferMessage);
+            return;
           }
+
+          const fallbackMessage = await createSystemMessage(
+            roomId,
+            actor.kind === "guest" ? GUEST_HANDOFF_PROMPT : AUTH_USER_HANDOFF_PROMPT,
+            actor.kind === "guest" ? "auth_required" : "status",
+          );
+
+          await chatRepo.updateRoomStatus(roomId, {
+            status: "active",
+            awaitingResolutionConfirm: false,
+            resolvedAt: null,
+            lastMessage: fallbackMessage.content,
+          });
+
+          io.to(roomId).emit("botStreamEnd", { roomId, message: null });
+          emitMessage(io, roomId, fallbackMessage);
         },
-        customerName,
+        actor.customerName,
       );
-    } catch (err) {
-      console.error("[chat.service] Stream error:", err);
-      io.to(roomId).emit("botStreamEnd", { roomId, message: null, error: true });
+    } catch (error) {
+      console.error("[chat.service] Stream error:", error);
+      io.to(roomId).emit("botStreamEnd", {
+        roomId,
+        message: null,
+        error: true,
+      });
     } finally {
       processingRooms.delete(roomIdStr);
     }
@@ -319,11 +432,10 @@ const adminSendMessage = async (adminId, roomId, { content }) => {
   });
 };
 
-const getMessages = async (customerId, page = 1) => {
-  const room = await chatRepo.findRoomByCustomer(customerId);
-  if (!room) {
-    throw new ApiError(404, "Không tìm thấy phòng chat.");
-  }
+const getMessages = async (actorPayload, roomId, page = 1) => {
+  const actor = buildActor(actorPayload);
+  const room = await resolveRoomForActor(roomId, actor);
+  assertRoomAccess(room, actor);
 
   const data = await chatRepo.getMessages(room._id, page);
   return {
@@ -333,9 +445,15 @@ const getMessages = async (customerId, page = 1) => {
       awaitingResolutionConfirm: room.awaitingResolutionConfirm,
       resolvedAt: room.resolvedAt,
       closedAt: room.closedAt,
+      isGuestSession: room.isGuestSession,
     },
     ...data,
   };
+};
+
+const confirmResolution = async (actorPayload, roomId, resolved) => {
+  const actor = buildActor(actorPayload);
+  return handleResolutionDecision(actor, roomId, resolved);
 };
 
 const transferToAdmin = async (roomId, adminId) => {
@@ -356,7 +474,9 @@ const listSupportRooms = async ({ page = 1, limit = 20, status, keyword }) => {
 
 const getRoomMessagesForStaff = async (roomId, page = 1) => {
   const room = await chatRepo.findRoomById(roomId);
-  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+  if (!room) {
+    throw new ApiError(404, "Không tìm thấy phòng chat.");
+  }
 
   const data = await chatRepo.getMessages(roomId, page);
   return {
@@ -370,6 +490,7 @@ const getRoomMessagesForStaff = async (roomId, page = 1) => {
       closedAt: room.closedAt,
       lastMessage: room.lastMessage,
       updatedAt: room.updatedAt,
+      isGuestSession: room.isGuestSession,
     },
     ...data,
   };
@@ -381,7 +502,9 @@ const sendMessageByStaff = async (staffUser, roomId, { content }) => {
   }
 
   const room = await chatRepo.findRoomById(roomId);
-  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+  if (!room) {
+    throw new ApiError(404, "Không tìm thấy phòng chat.");
+  }
   if (room.status === "closed") {
     throw new ApiError(400, "Phiên chat đã kết thúc.");
   }
@@ -414,7 +537,9 @@ const sendMessageByStaff = async (staffUser, roomId, { content }) => {
 
 const assignRoomToStaff = async (roomId, staffUserId) => {
   const room = await chatRepo.findRoomById(roomId);
-  if (!room) throw new ApiError(404, "Không tìm thấy phòng chat.");
+  if (!room) {
+    throw new ApiError(404, "Không tìm thấy phòng chat.");
+  }
 
   const updated = await chatRepo.assignAdminToRoom(roomId, staffUserId);
   const io = getIO();
@@ -425,6 +550,7 @@ const assignRoomToStaff = async (roomId, staffUserId) => {
 module.exports = {
   getOrCreateRoom,
   sendMessage,
+  confirmResolution,
   adminSendMessage,
   getMessages,
   transferToAdmin,
