@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
+const unaccent = (value) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+
 export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -11,6 +18,7 @@ export default function LoginPage() {
   const location = useLocation();
   const successMessage = location.state?.message || "";
   const nextPath = location.state?.from?.pathname || "/";
+  const normalizedError = unaccent(error);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,7 +29,7 @@ export default function LoginPage() {
       await login(formData.email, formData.password);
       navigate(nextPath, { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || "Loi dang nhap");
+      setError(err.response?.data?.message || "Lỗi đăng nhập");
     } finally {
       setLoading(false);
     }
@@ -29,7 +37,7 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-md mx-auto mt-12 card p-8">
-      <h1 className="text-2xl font-bold text-center mb-6">Dang nhap</h1>
+      <h1 className="text-2xl font-bold text-center mb-6">Đăng nhập</h1>
 
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>
@@ -54,7 +62,7 @@ export default function LoginPage() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Mat khau</label>
+          <label className="block text-sm font-medium mb-1">Mật khẩu</label>
           <input
             type="password"
             required
@@ -66,17 +74,17 @@ export default function LoginPage() {
           />
         </div>
         <button type="submit" disabled={loading} className="btn-primary w-full">
-          {loading ? "Dang dang nhap..." : "Dang nhap"}
+          {loading ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
       </form>
 
       <div className="mt-6 space-y-2 text-center">
         <p>
           <Link to="/forgot-password" className="text-primary hover:underline">
-            Quen mat khau?
+            Quên mật khẩu?
           </Link>
         </p>
-        {error.toLowerCase().includes("chua duoc xac thuc") && (
+        {normalizedError.includes("chua duoc xac thuc") && (
           <p>
             <button
               type="button"
@@ -87,14 +95,14 @@ export default function LoginPage() {
               }
               className="text-primary hover:underline"
             >
-              Nhap OTP xac thuc tai khoan
+              Nhập OTP xác thực tài khoản
             </button>
           </p>
         )}
         <p>
-          Chua co tai khoan?{" "}
+          Chưa có tài khoản?{" "}
           <Link to="/register" className="text-primary hover:underline">
-            Dang ky ngay
+            Đăng ký ngay
           </Link>
         </p>
       </div>
