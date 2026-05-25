@@ -23,20 +23,20 @@ const AUTH_USER_HANDOFF_PROMPT =
   "Chatbot AI ch\u01b0a t\xecm \u0111\u01b0\u1ee3c c\xe2u tr\u1ea3 l\u1eddi ph\xf9 h\u1ee3p. H\u1ec7 th\u1ed1ng s\u1ebd chuy\u1ec3n y\xeau c\u1ea7u \u0111\u1ebfn nh\xe2n vi\xean h\u1ed7 tr\u1ee3.";
 const RESOLVED_LABEL = "\u0110\xe3 gi\u1ea3i quy\u1ebft";
 const CONTINUE_LABEL = "H\u1ecfi th\xeam";
-const RESOLUTION_PROMPT = "Thong tin tren da giai quyet van de cua ban chua?";
+const RESOLUTION_PROMPT = "Thông tin trên đã giải quyết vấn đề của bạn chưa?";
 const RESOLUTION_CLOSING_MESSAGE =
-  "Cam on ban da xac nhan. He thong se ket thuc phien chat.";
+  "Cảm ơn bạn đã xác nhận. Hệ thống sẽ kết thúc phiên chat.";
 const CONTINUE_SUPPORT_MESSAGE =
-  "Minh da ghi nhan ban can ho tro them. Ban hay mo ta chi tiet hon de chatbot tiep tuc xu ly.";
-const EMPTY_MESSAGE_ERROR = "Noi dung tin nhan khong duoc de trong.";
-const ROOM_NOT_FOUND_ERROR = "Khong tim thay phong chat.";
-const ROOM_ACCESS_DENIED_ERROR = "Ban khong co quyen truy cap phong chat nay.";
+  "Mình đã ghi nhận bạn cần hỗ trợ thêm. Bạn hãy mô tả chi tiết hơn để chatbot tiếp tục xử lý.";
+const EMPTY_MESSAGE_ERROR = "Nội dung tin nhắn không được để trống.";
+const ROOM_NOT_FOUND_ERROR = "Không tìm thấy phòng chat.";
+const ROOM_ACCESS_DENIED_ERROR = "Bạn không có quyền truy cập phòng chat này.";
 const GUEST_SESSION_REQUIRED_ERROR =
-  "Phien chat cua khach vang lai chua duoc khoi tao.";
-const BOT_BUSY_ERROR = "Bot dang xu ly tin nhan truoc do. Vui long doi.";
-const ADMIN_ROOM_FORBIDDEN_ERROR = "Ban khong phai admin cua phong nay.";
-const STAFF_ROOM_TAKEN_ERROR = "Phong chat dang duoc nhan vien khac phu trach.";
-const CLOSED_ROOM_STATUS_MESSAGE = "Phien chat da ket thuc.";
+  "Phiên chat của khách vãng lai chưa được khởi tạo.";
+const BOT_BUSY_ERROR = "Bot đang xử lý tin nhắn trước đó. Vui lòng đợi.";
+const ADMIN_ROOM_FORBIDDEN_ERROR = "Bạn không phải admin của phòng này.";
+const STAFF_ROOM_TAKEN_ERROR = "Phòng chat đang được nhân viên khác phụ trách.";
+const CLOSED_ROOM_STATUS_MESSAGE = "Phiên chat đã kết thúc.";
 
 const CHAT_PROCESSING_LOCK_TTL_MS = Number(
   process.env.CHAT_PROCESSING_LOCK_TTL_MS || 2 * 60 * 1000,
