@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import axiosClient from "../api/axiosClient";
+import { useAuth } from "../contexts/AuthContext";
+import {
+  buildChatRequestConfig,
+  syncGuestChatSession,
+  extractChatMessages,
+} from "../utils/chatSession";
 
 function BotAvatar() {
   return (
@@ -13,7 +19,20 @@ function BotAvatar() {
 
 function formatTime(date) {
   if (!date) return "";
-  return new Date(date).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return new Date(date).toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function normalizeStatusText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function renderContent(content) {
@@ -21,8 +40,11 @@ function renderContent(content) {
   const regex = /\[\[([^\]|]+)\|([^\]]+)\]\]/g;
   let lastIndex = 0;
   let match;
+
   while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) parts.push(content.slice(lastIndex, match.index));
+    if (match.index > lastIndex) {
+      parts.push(content.slice(lastIndex, match.index));
+    }
     const [, name, id] = match;
     parts.push(
       <Link
@@ -30,16 +52,22 @@ function renderContent(content) {
         to={`/products/${id}`}
         className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 bg-primary/10 text-primary border border-primary/30 rounded-full text-xs font-medium hover:bg-primary/20"
       >
-        🛍 {name}
-      </Link>
+        {name}
+      </Link>,
     );
     lastIndex = regex.lastIndex;
   }
-  if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
   return parts.length > 0 ? parts : content;
 }
 
 export default function ChatWidget() {
+  const { token } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [roomId, setRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -50,72 +78,113 @@ export default function ChatWidget() {
   const [streamingContent, setStreamingContent] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
   const roomIdRef = useRef(null);
 
-  const scrollToBottom = () => bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = () =>
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  useEffect(() => { scrollToBottom(); }, [messages, streamingContent, isTyping]);
+  const appendUniqueMessages = (incoming) => {
+    const list = Array.isArray(incoming) ? incoming : [incoming];
+    setMessages((prev) => {
+      const map = new Map(prev.map((msg) => [String(msg._id), msg]));
+      for (const msg of list) {
+        if (!msg?._id) continue;
+        map.set(String(msg._id), msg);
+      }
+      return Array.from(map.values()).sort(
+        (a, b) => new Date(a.sentAt) - new Date(b.sentAt),
+      );
+    });
+  };
 
-  // Khởi tạo room + socket 1 lần khi component mount (không phụ thuộc vào open)
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingContent, isTyping]);
+
+  useEffect(() => {
+    setShowLoginPrompt(
+      !token && messages.some((message) => message.type === "auth_required"),
+    );
+  }, [messages, token]);
+
   useEffect(() => {
     let mounted = true;
 
     const init = async () => {
       try {
-        const roomRes = await axiosClient.get("/chat/rooms");
-        const rid = roomRes.data?.data?._id;
+        const roomRes = await axiosClient.get("/chat/rooms", buildChatRequestConfig());
+        const payload = roomRes.data?.data;
+        syncGuestChatSession(payload);
+
+        const rid = payload?._id;
         if (!rid || !mounted) return;
+
         setRoomId(rid);
         roomIdRef.current = rid;
 
-        const msgRes = await axiosClient.get(`/chat/rooms/${rid}/messages`);
+        const msgRes = await axiosClient.get(
+          `/chat/rooms/${rid}/messages`,
+          buildChatRequestConfig(),
+        );
         if (!mounted) return;
+
         setMessages(msgRes.data?.data?.messages || []);
         setRoomStatus(msgRes.data?.data?.room?.status || "active");
         setAwaitingConfirm(Boolean(msgRes.data?.data?.room?.awaitingResolutionConfirm));
 
         const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
         const socketBase = apiBase.replace(/\/api\/?$/, "");
-        // Không giới hạn transport → cho phép fallback polling nếu WebSocket fail
         const socket = io(socketBase);
         socketRef.current = socket;
         socket.emit("joinRoom", rid);
 
-        socket.on("newMessage", (msg) => {
+        socket.on("newMessage", (message) => {
           if (!mounted) return;
-          setMessages((prev) => {
-            const map = new Map(prev.map((m) => [String(m._id), m]));
-            if (msg?._id) map.set(String(msg._id), msg);
-            return Array.from(map.values()).sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
-          });
-          setUnread((n) => n + 1);
+          appendUniqueMessages(message);
+          if (!open) {
+            setUnread((count) => count + 1);
+          }
+          if (message.type === "auth_required" && !token) {
+            setShowLoginPrompt(true);
+          }
 
-          const norm = String(msg.content || "").toLowerCase();
-          if (msg.senderRole === "bot") {
-            if (norm.includes("đã giải quyết vấn đề")) { setAwaitingConfirm(true); setRoomStatus("resolved"); }
-            if (norm.includes("kết thúc phiên chat")) { setAwaitingConfirm(false); setRoomStatus("closed"); }
+          const normalized = normalizeStatusText(message.content);
+          if (normalized.includes("giai quyet van de")) {
+            setAwaitingConfirm(true);
+            setRoomStatus("resolved");
+          }
+          if (normalized.includes("ket thuc phien chat")) {
+            setAwaitingConfirm(false);
+            setRoomStatus("closed");
           }
         });
 
-        socket.on("botStreamStart", () => { if (mounted) { setIsTyping(true); setStreamingContent(""); } });
-        socket.on("botStreamChunk", ({ chunk }) => { if (mounted) { setIsTyping(false); setStreamingContent((p) => (p === null ? chunk : p + chunk)); } });
+        socket.on("botStreamStart", () => {
+          if (!mounted) return;
+          setIsTyping(true);
+          setStreamingContent("");
+        });
+
+        socket.on("botStreamChunk", ({ chunk }) => {
+          if (!mounted) return;
+          setIsTyping(false);
+          setStreamingContent((prev) => (prev === null ? chunk : prev + chunk));
+        });
+
         socket.on("botStreamEnd", ({ message }) => {
           if (!mounted) return;
           setIsTyping(false);
           setStreamingContent(null);
           if (message) {
-            setMessages((prev) => {
-              const map = new Map(prev.map((m) => [String(m._id), m]));
-              map.set(String(message._id), message);
-              return Array.from(map.values()).sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
-            });
+            appendUniqueMessages(message);
           }
         });
-      } catch (err) {
-        console.error("ChatWidget init error:", err);
+      } catch (error) {
+        console.error("ChatWidget init error:", error);
       }
     };
 
@@ -124,32 +193,41 @@ export default function ChatWidget() {
     return () => {
       mounted = false;
       if (socketRef.current) {
-        if (roomIdRef.current) socketRef.current.emit("leaveRoom", roomIdRef.current);
+        if (roomIdRef.current) {
+          socketRef.current.emit("leaveRoom", roomIdRef.current);
+        }
         socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, []); // chỉ chạy 1 lần khi mount
+  }, [token, open]);
 
-  const handleOpen = () => { setOpen((prev) => !prev); setUnread(0); };
+  const handleOpen = () => {
+    setOpen((prev) => !prev);
+    setUnread(0);
+  };
 
   const sendText = async (text) => {
     if (!text.trim() || !roomId || roomStatus === "closed") return;
     setInput("");
+
     try {
       setSending(true);
-      const res = await axiosClient.post(`/chat/rooms/${roomId}/messages`, { content: text.trim() });
-      const data = res.data?.data;
-      if (data) {
-        const list = Array.isArray(data) ? data : [data];
-        setMessages((prev) => {
-          const map = new Map(prev.map((m) => [String(m._id), m]));
-          list.forEach((m) => m?._id && map.set(String(m._id), m));
-          return Array.from(map.values()).sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
-        });
+      const res = await axiosClient.post(
+        `/chat/rooms/${roomId}/messages`,
+        { content: text.trim() },
+        buildChatRequestConfig(),
+      );
+      const payload = res.data?.data;
+      const nextMessages = extractChatMessages(payload);
+      if (nextMessages.length > 0) {
+        appendUniqueMessages(nextMessages);
       }
-    } catch (err) {
-      console.error(err);
+      if (payload?.requiresLogin && !token) {
+        setShowLoginPrompt(true);
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       setSending(false);
     }
@@ -164,23 +242,28 @@ export default function ChatWidget() {
     if (!roomId) return;
     try {
       setSending(true);
-      const res = await axiosClient.post(`/chat/rooms/${roomId}/resolve`, { resolved });
-      const data = res.data?.data;
-      if (data) {
-        const list = Array.isArray(data) ? data : [data];
-        setMessages((prev) => {
-          const map = new Map(prev.map((m) => [String(m._id), m]));
-          list.forEach((m) => m?._id && map.set(String(m._id), m));
-          return Array.from(map.values()).sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
-        });
-      }
+      const res = await axiosClient.post(
+        `/chat/rooms/${roomId}/resolve`,
+        { resolved },
+        buildChatRequestConfig(),
+      );
+      appendUniqueMessages(extractChatMessages(res.data?.data));
       setAwaitingConfirm(false);
       setRoomStatus(resolved ? "closed" : "active");
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error(error);
     } finally {
       setSending(false);
     }
+  };
+
+  const goToLogin = () => {
+    navigate("/login", {
+      state: {
+        from: { pathname: "/chat" },
+        message: "Đăng nhập để tiếp tục xử lý đơn hàng, đổi trả và tài khoản.",
+      },
+    });
   };
 
   const isClosed = roomStatus === "closed";
@@ -189,7 +272,6 @@ export default function ChatWidget() {
 
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={handleOpen}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
@@ -213,18 +295,21 @@ export default function ChatWidget() {
         )}
       </button>
 
-      {/* Chat popup */}
       {open && (
         <div className="fixed bottom-24 right-6 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200" style={{ height: "480px" }}>
-          {/* Header */}
           <div className="px-4 py-3 bg-primary text-white flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">AI</div>
             <div className="flex-1">
               <p className="font-semibold text-sm">Trợ lý EShop</p>
               <p className="text-[11px] text-white/70 flex items-center gap-1">
-                {isClosed
-                  ? "Phiên đã kết thúc"
-                  : <><span className="w-1.5 h-1.5 bg-green-300 rounded-full" /> Đang hoạt động</>}
+                {isClosed ? (
+                  "Phiên đã kết thúc"
+                ) : (
+                  <>
+                    <span className="w-1.5 h-1.5 bg-green-300 rounded-full" />
+                    {token ? "Đã đăng nhập" : "Khách vãng lai"}
+                  </>
+                )}
               </p>
             </div>
             <Link to="/chat" className="text-white/70 hover:text-white text-[11px] underline">
@@ -232,16 +317,22 @@ export default function ChatWidget() {
             </Link>
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 bg-gray-50">
             {messages.map((msg) => {
               const isCustomer = msg.senderRole === "customer";
               const isSystem = msg.type === "status" || msg.senderRole === "system";
+              const isAuthRequired = msg.type === "auth_required";
 
-              if (isSystem) {
+              if (isSystem || isAuthRequired) {
                 return (
                   <div key={msg._id} className="flex justify-center">
-                    <span className="text-[11px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full text-center max-w-[90%]">
+                    <span
+                      className={`text-[11px] px-3 py-1 rounded-full text-center max-w-[90%] ${
+                        isAuthRequired
+                          ? "text-amber-800 bg-amber-100 border border-amber-200"
+                          : "text-gray-400 bg-gray-100"
+                      }`}
+                    >
                       {msg.content}
                     </span>
                   </div>
@@ -261,7 +352,6 @@ export default function ChatWidget() {
               );
             })}
 
-            {/* Typing indicator */}
             {isTyping && (
               <div className="flex gap-1.5 justify-start">
                 <BotAvatar />
@@ -273,7 +363,6 @@ export default function ChatWidget() {
               </div>
             )}
 
-            {/* Streaming text */}
             {!isTyping && isStreaming && (
               <div className="flex gap-1.5 justify-start">
                 <BotAvatar />
@@ -287,7 +376,17 @@ export default function ChatWidget() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Resolution confirm */}
+          {showLoginPrompt && !token && (
+            <div className="px-3 py-2 bg-amber-50 border-t border-amber-100 flex flex-col gap-2">
+              <p className="text-[11px] text-amber-900">
+                Đăng nhập để xem đơn hàng, đổi trả, thanh toán và lịch sử hỗ trợ của bạn.
+              </p>
+              <button onClick={goToLogin} className="btn-primary text-xs py-1.5">
+                Đăng nhập
+              </button>
+            </div>
+          )}
+
           {awaitingConfirm && !isClosed && (
             <div className="px-3 py-2 bg-blue-50 border-t border-blue-100 flex gap-2">
               <button onClick={() => handleConfirm(true)} disabled={sending} className="flex-1 btn-primary text-xs py-1.5 disabled:opacity-50">Đã giải quyết</button>
@@ -295,35 +394,33 @@ export default function ChatWidget() {
             </div>
           )}
 
-          {/* Quick reply gợi ý */}
           {!isClosed && !awaitingConfirm && !isTyping && !isStreaming && messages.length <= 2 && (
             <div className="px-3 py-2 border-t bg-white flex flex-wrap gap-1.5">
               {[
-                { icon: "🚚", label: "Kiểm tra đơn hàng" },
-                { icon: "💰", label: "Phí giao hàng" },
-                { icon: "🔄", label: "Chính sách đổi trả" },
-                { icon: "👗", label: "Gợi ý sản phẩm" },
-              ].map(({ icon, label }) => (
+                "Kiểm tra đơn hàng",
+                "Phí giao hàng",
+                "Chính sách đổi trả",
+                "Gợi ý sản phẩm",
+              ].map((label) => (
                 <button
                   key={label}
                   onClick={() => sendText(label)}
                   disabled={inputDisabled}
                   className="text-[11px] px-2.5 py-1 rounded-full border border-primary/40 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
                 >
-                  {icon} {label}
+                  {label}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Input */}
           <div className="px-3 py-2.5 border-t bg-white flex gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder={isClosed ? "Phiên đã kết thúc" : "Nhập tin nhắn..."}
+              placeholder={isClosed ? "Phiên chat đã kết thúc" : "Nhập tin nhắn..."}
               className="input-field flex-1 text-xs py-2"
               disabled={inputDisabled}
             />
@@ -332,10 +429,13 @@ export default function ChatWidget() {
               disabled={inputDisabled || !input.trim()}
               className="btn-primary px-3 py-2 text-xs disabled:opacity-40"
             >
-              {sending
-                ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-              }
+              {sending ? (
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              )}
             </button>
           </div>
         </div>

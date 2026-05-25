@@ -54,12 +54,10 @@ export default function SupportChatPage() {
 
   useEffect(() => {
     loadRooms();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     loadMessages(selectedRoomId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoomId]);
 
   useEffect(() => {
@@ -69,7 +67,6 @@ export default function SupportChatPage() {
     }, 12000);
 
     return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoomId, keyword]);
 
   const assignToMe = async (roomId) => {
@@ -96,12 +93,17 @@ export default function SupportChatPage() {
     }
   };
 
+  const renderCustomerName = (room) =>
+    room?.customerDisplayName || room?.customerId?.name || "Unknown user";
+
+  const renderCustomerEmail = (room) =>
+    room?.customerDisplayEmail || room?.customerId?.email || "";
+
   return (
     <StaffLayout
       title="Employee - Customer Support"
-      subtitle="Nhận phòng chat, phản hồi khách hàng theo thời gian thực"
+      subtitle="Nhan phong chat va phan hoi khach hang theo thoi gian thuc"
     >
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-4 lg:col-span-1">
           <div className="flex gap-2 mb-3">
@@ -135,8 +137,8 @@ export default function SupportChatPage() {
                       : "border-gray-200 hover:border-primary/40"
                   }`}
                 >
-                  <div className="font-semibold">{room.customerId?.name || "Unknown user"}</div>
-                  <div className="text-xs text-gray-500">{room.customerId?.email || ""}</div>
+                  <div className="font-semibold">{renderCustomerName(room)}</div>
+                  <div className="text-xs text-gray-500">{renderCustomerEmail(room)}</div>
                   <div className="text-xs text-gray-600 mt-1">Status: {room.status}</div>
                   <div className="text-xs text-gray-500 truncate mt-1">
                     {room.lastMessage || "No message yet"}
@@ -156,11 +158,9 @@ export default function SupportChatPage() {
             <>
               <div className="flex items-center justify-between border-b pb-3 mb-3">
                 <div>
-                  <div className="font-semibold">
-                    {selectedRoom.customerId?.name || "Unknown user"}
-                  </div>
+                  <div className="font-semibold">{renderCustomerName(selectedRoom)}</div>
                   <div className="text-xs text-gray-500">
-                    {selectedRoom.customerId?.email || ""}
+                    {renderCustomerEmail(selectedRoom)}
                   </div>
                 </div>
                 <button

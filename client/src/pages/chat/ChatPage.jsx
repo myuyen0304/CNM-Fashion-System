@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
 import axiosClient from "../../api/axiosClient";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  buildChatRequestConfig,
+  syncGuestChatSession,
+  extractChatMessages,
+} from "../../utils/chatSession";
 
-// Bot avatar icon
 function BotAvatar() {
   return (
     <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold shrink-0 mt-1">
@@ -12,7 +17,6 @@ function BotAvatar() {
   );
 }
 
-// Format thời gian: HH:mm
 function formatTime(date) {
   if (!date) return "";
   return new Date(date).toLocaleTimeString("vi-VN", {
@@ -21,7 +25,16 @@ function formatTime(date) {
   });
 }
 
-// Parse [[Tên sản phẩm|productId]] → styled product chip
+function normalizeStatusText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function renderMessageContent(content) {
   const parts = [];
   const regex = /\[\[([^\]|]+)\|([^\]]+)\]\]/g;
@@ -34,6 +47,7 @@ function renderMessageContent(content) {
         <span key={`text-${lastIndex}`}>{content.slice(lastIndex, match.index)}</span>,
       );
     }
+
     const [, name, id] = match;
     parts.push(
       <Link
@@ -51,23 +65,27 @@ function renderMessageContent(content) {
   }
 
   if (lastIndex < content.length) {
-    parts.push(
-      <span key={`text-end`}>{content.slice(lastIndex)}</span>,
-    );
+    parts.push(<span key="text-end">{content.slice(lastIndex)}</span>);
   }
 
   return parts.length > 0 ? parts : content;
 }
 
-// Bubble tin nhắn
 function MessageBubble({ msg, isStreaming = false }) {
   const isCustomer = msg.senderRole === "customer";
   const isSystem = msg.type === "status" || msg.senderRole === "system";
+  const isAuthRequired = msg.type === "auth_required";
 
-  if (isSystem) {
+  if (isSystem || isAuthRequired) {
     return (
       <div className="flex justify-center">
-        <div className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full max-w-sm text-center">
+        <div
+          className={`text-xs px-3 py-1 rounded-full max-w-sm text-center ${
+            isAuthRequired
+              ? "text-amber-800 bg-amber-100 border border-amber-200"
+              : "text-gray-500 bg-gray-100"
+          }`}
+        >
           {msg.content}
         </div>
       </div>
@@ -104,7 +122,6 @@ function MessageBubble({ msg, isStreaming = false }) {
   );
 }
 
-// Typing indicator
 function TypingIndicator() {
   return (
     <div className="flex gap-2 justify-start">
@@ -120,6 +137,9 @@ function TypingIndicator() {
 
 export default function ChatPage() {
   const { id: routeRoomId } = useParams();
+  const { token } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [roomId, setRoomId] = useState(routeRoomId || null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -127,12 +147,11 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [roomStatus, setRoomStatus] = useState("active");
   const [awaitingResolutionConfirm, setAwaitingResolutionConfirm] = useState(false);
-  // Streaming state
-  const [streamingContent, setStreamingContent] = useState(null); // null = not streaming
-  const [isTyping, setIsTyping] = useState(false); // bot is "thinking" before streaming starts
+  const [streamingContent, setStreamingContent] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   const messagesEndRef = useRef(null);
-  const socketRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -157,68 +176,99 @@ export default function ChatPage() {
   }, [messages, streamingContent, isTyping]);
 
   useEffect(() => {
-    if (routeRoomId) {
-      setRoomId(routeRoomId);
-      return;
-    }
-
-    axiosClient.get("/chat/rooms").then((res) => {
-      const nextRoomId = res.data?.data?._id;
-      if (nextRoomId) setRoomId(nextRoomId);
-    }).catch(console.error);
-  }, [routeRoomId]);
+    setShowLoginPrompt(
+      !token && messages.some((message) => message.type === "auth_required"),
+    );
+  }, [messages, token]);
 
   useEffect(() => {
-    if (!roomId) return;
+    let ignore = false;
 
-    let socket;
+    if (routeRoomId) {
+      setRoomId(routeRoomId);
+      return undefined;
+    }
+
+    const loadRoom = async () => {
+      try {
+        const res = await axiosClient.get("/chat/rooms", buildChatRequestConfig());
+        const payload = res.data?.data;
+        syncGuestChatSession(payload);
+        if (!ignore && payload?._id) {
+          setRoomId(payload._id);
+        }
+      } catch (error) {
+        console.error("Chat room init error:", error);
+      }
+    };
+
+    loadRoom();
+
+    return () => {
+      ignore = true;
+    };
+  }, [routeRoomId, token]);
+
+  useEffect(() => {
+    if (!roomId) return undefined;
+
+    let active = true;
+    const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    const socketBase = apiBase.replace(/\/api\/?$/, "");
+    const socket = io(socketBase);
 
     const initChat = async () => {
       setLoading(true);
       try {
-        const res = await axiosClient.get(`/chat/rooms/${roomId}/messages`);
-        setMessages(res.data?.data?.messages || []);
-        setRoomStatus(res.data?.data?.room?.status || "active");
-        setAwaitingResolutionConfirm(
-          Boolean(res.data?.data?.room?.awaitingResolutionConfirm),
+        const res = await axiosClient.get(
+          `/chat/rooms/${roomId}/messages`,
+          buildChatRequestConfig(),
         );
+        const room = res.data?.data?.room || {};
+        const nextMessages = res.data?.data?.messages || [];
 
-        const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-        const socketBase = apiBase.replace(/\/api\/?$/, "");
+        if (!active) return;
 
-        socket = io(socketBase);
-        socketRef.current = socket;
+        setMessages(nextMessages);
+        setRoomStatus(room.status || "active");
+        setAwaitingResolutionConfirm(Boolean(room.awaitingResolutionConfirm));
 
         socket.emit("joinRoom", roomId);
 
         socket.on("newMessage", (message) => {
           appendUniqueMessages(message);
 
+          if (message.type === "auth_required" && !token) {
+            setShowLoginPrompt(true);
+          }
+
           if (message.senderRole === "bot" || message.senderRole === "system") {
-            const normalized = String(message.content || "").toLowerCase();
-            if (normalized.includes("đã giải quyết vấn đề") || normalized.includes("da giai quyet")) {
+            const normalized = normalizeStatusText(message.content);
+            if (normalized.includes("giai quyet van de")) {
               setAwaitingResolutionConfirm(true);
               setRoomStatus("resolved");
             }
-            if (normalized.includes("kết thúc phiên chat")) {
+            if (normalized.includes("ket thuc phien chat")) {
               setAwaitingResolutionConfirm(false);
               setRoomStatus("closed");
             }
           }
         });
 
-        // Streaming events
         socket.on("botStreamStart", () => {
+          if (!active) return;
           setIsTyping(true);
           setStreamingContent("");
         });
 
         socket.on("botStreamChunk", ({ chunk }) => {
+          if (!active) return;
           setIsTyping(false);
           setStreamingContent((prev) => (prev === null ? chunk : prev + chunk));
         });
 
         socket.on("botStreamEnd", ({ message }) => {
+          if (!active) return;
           setIsTyping(false);
           setStreamingContent(null);
           if (message) {
@@ -227,40 +277,52 @@ export default function ChatPage() {
         });
 
         socket.on("adminAssigned", () => {
+          if (!active) return;
           setIsTyping(false);
           setStreamingContent(null);
         });
-
-      } catch (err) {
-        console.error("Chat init error:", err);
+      } catch (error) {
+        console.error("Chat init error:", error);
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     };
 
     initChat();
 
     return () => {
-      if (socket) {
-        socket.emit("leaveRoom", roomId);
-        socket.disconnect();
-      }
+      active = false;
+      socket.emit("leaveRoom", roomId);
+      socket.disconnect();
     };
-  }, [roomId]);
+  }, [roomId, token]);
 
   const sendText = async (text) => {
     if (!text.trim() || !roomId || roomStatus === "closed") return;
+
     setInput("");
     try {
       setSending(true);
-      const res = await axiosClient.post(`/chat/rooms/${roomId}/messages`, { content: text.trim() });
-      const data = res.data?.data;
-      if (data) appendUniqueMessages(Array.isArray(data) ? data : [data]);
-    } catch (err) {
+      const res = await axiosClient.post(
+        `/chat/rooms/${roomId}/messages`,
+        { content: text.trim() },
+        buildChatRequestConfig(),
+      );
+      const payload = res.data?.data;
+      const nextMessages = extractChatMessages(payload);
+      if (nextMessages.length > 0) {
+        appendUniqueMessages(nextMessages);
+      }
+      if (payload?.requiresLogin && !token) {
+        setShowLoginPrompt(true);
+      }
+    } catch (error) {
       appendUniqueMessages({
         _id: `err-${Date.now()}`,
         senderRole: "system",
-        content: err.response?.data?.message || "Lỗi gửi tin nhắn",
+        content: error.response?.data?.message || "Lỗi gửi tin nhắn",
         type: "status",
         sentAt: new Date().toISOString(),
       });
@@ -275,20 +337,29 @@ export default function ChatPage() {
     if (!roomId) return;
     try {
       setSending(true);
-      const res = await axiosClient.post(`/chat/rooms/${roomId}/resolve`, { resolved });
-      appendUniqueMessages(res.data?.data);
-      if (resolved) {
-        setRoomStatus("closed");
-        setAwaitingResolutionConfirm(false);
-      } else {
-        setRoomStatus("active");
-        setAwaitingResolutionConfirm(false);
-      }
-    } catch (err) {
-      console.error(err);
+      const res = await axiosClient.post(
+        `/chat/rooms/${roomId}/resolve`,
+        { resolved },
+        buildChatRequestConfig(),
+      );
+      const nextMessages = extractChatMessages(res.data?.data);
+      appendUniqueMessages(nextMessages);
+      setRoomStatus(resolved ? "closed" : "active");
+      setAwaitingResolutionConfirm(false);
+    } catch (error) {
+      console.error(error);
     } finally {
       setSending(false);
     }
+  };
+
+  const goToLogin = () => {
+    navigate("/login", {
+      state: {
+        from: { pathname: location.pathname },
+        message: "Đăng nhập để tiếp tục xử lý đơn hàng, đổi trả và tài khoản.",
+      },
+    });
   };
 
   if (loading) {
@@ -304,7 +375,6 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col h-[600px] card overflow-hidden">
-      {/* Header */}
       <div className="px-4 py-3 border-b bg-white flex items-center gap-3">
         <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
           AI
@@ -317,23 +387,20 @@ export default function ChatPage() {
             ) : (
               <>
                 <span className="w-2 h-2 bg-green-400 rounded-full inline-block" />
-                Đang hoạt động
+                {token ? "Đã đăng nhập" : "Khách vãng lai"}
               </>
             )}
           </p>
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-gray-50">
         {messages.map((msg) => (
           <MessageBubble key={msg._id} msg={msg} />
         ))}
 
-        {/* Typing indicator (chờ AI bắt đầu stream) */}
         {isTyping && <TypingIndicator />}
 
-        {/* Streaming message (đang gõ từng chữ) */}
         {!isTyping && streamingContent !== null && (
           <MessageBubble
             msg={{
@@ -349,28 +416,17 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick reply gợi ý — hiện khi mới bắt đầu chat */}
-      {!isClosed && !awaitingResolutionConfirm && !isTyping && streamingContent === null && messages.length <= 2 && (
-        <div className="px-4 py-2.5 border-t bg-white flex flex-wrap gap-2">
-          {[
-            { icon: "🚚", label: "Kiểm tra đơn hàng" },
-            { icon: "💰", label: "Phí giao hàng" },
-            { icon: "🔄", label: "Chính sách đổi trả" },
-            { icon: "👗", label: "Gợi ý sản phẩm" },
-          ].map(({ icon, label }) => (
-            <button
-              key={label}
-              onClick={() => sendText(label)}
-              disabled={sending || isTyping || streamingContent !== null}
-              className="text-xs px-3 py-1.5 rounded-full border border-primary/40 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
-            >
-              {icon} {label}
-            </button>
-          ))}
+      {showLoginPrompt && !token && (
+        <div className="px-4 py-3 bg-amber-50 border-t border-amber-100 flex flex-wrap items-center gap-2">
+          <p className="text-sm text-amber-900 flex-1 min-w-[220px]">
+            Đăng nhập để xem đơn hàng, đổi trả, thanh toán và lịch sử hỗ trợ của bạn.
+          </p>
+          <button onClick={goToLogin} className="btn-primary text-xs px-3 py-1.5">
+            Đăng nhập
+          </button>
         </div>
       )}
 
-      {/* Resolution confirm */}
       {awaitingResolutionConfirm && !isClosed && (
         <div className="px-4 py-3 bg-blue-50 border-t border-blue-100 flex flex-wrap items-center gap-2">
           <p className="text-sm text-gray-600 flex-1 min-w-[160px]">
@@ -395,7 +451,30 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Input */}
+      {!isClosed &&
+        !awaitingResolutionConfirm &&
+        !isTyping &&
+        streamingContent === null &&
+        messages.length <= 2 && (
+          <div className="px-4 py-2.5 border-t bg-white flex flex-wrap gap-2">
+            {[
+              "Kiểm tra đơn hàng",
+              "Phí giao hàng",
+              "Chính sách đổi trả",
+              "Gợi ý sản phẩm",
+            ].map((label) => (
+              <button
+                key={label}
+                onClick={() => sendText(label)}
+                disabled={sending || isTyping || streamingContent !== null}
+                className="text-xs px-3 py-1.5 rounded-full border border-primary/40 text-primary hover:bg-primary/10 transition-colors disabled:opacity-40"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
       <div className="px-4 py-3 border-t bg-white flex gap-2 items-end">
         <input
           type="text"
