@@ -5,7 +5,7 @@ const chatRoomSchema = new mongoose.Schema(
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
     },
     isGuestSession: {
       type: Boolean,
@@ -14,7 +14,6 @@ const chatRoomSchema = new mongoose.Schema(
     guestToken: {
       type: String,
       default: null,
-      index: true,
     },
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -59,7 +58,26 @@ const chatRoomSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-chatRoomSchema.index({ customerId: 1 }, { unique: true });
+chatRoomSchema.index(
+  { customerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      customerId: { $type: "objectId" },
+      isGuestSession: false,
+    },
+  },
+);
+chatRoomSchema.index(
+  { guestToken: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      guestToken: { $type: "string" },
+      isGuestSession: true,
+    },
+  },
+);
 
 const ChatRoom = mongoose.model("ChatRoom", chatRoomSchema);
 

@@ -50,7 +50,61 @@ const createGuestRoom = () => ({
   awaitingResolutionConfirm: false,
 });
 
+const createAuthRoom = () => ({
+  _id: "room-1",
+  customerId: "customer-1",
+  isGuestSession: false,
+  guestToken: null,
+  status: "active",
+  adminId: null,
+  awaitingResolutionConfirm: false,
+});
+
 const waitForAsyncWork = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("getOrCreateRoom attaches a guest room when the visitor logs in", async (t) => {
+  const io = createIoMock();
+  const { service, restore } = loadChatService(async () => {}, io);
+  t.after(restore);
+
+  const guestRoom = createGuestRoom();
+  const authRoom = createAuthRoom();
+
+  const findCustomerMock = t.mock.method(
+    chatRepo,
+    "findRoomByCustomer",
+    async () => null,
+  );
+  const findGuestMock = t.mock.method(
+    chatRepo,
+    "findRoomByGuestToken",
+    async () => guestRoom,
+  );
+  const attachMock = t.mock.method(
+    chatRepo,
+    "attachRoomToCustomer",
+    async () => authRoom,
+  );
+  const findOrCreateMock = t.mock.method(
+    chatRepo,
+    "findOrCreateRoom",
+    async () => {
+      throw new Error("should not create a separate customer room");
+    },
+  );
+  t.mock.method(chatRepo, "countMessages", async () => 1);
+
+  const result = await service.getOrCreateRoom({
+    user: { _id: "customer-1", name: "Linh" },
+    guestToken: "guest-1",
+  });
+
+  assert.equal(result, authRoom);
+  assert.equal(findCustomerMock.mock.calls.length, 1);
+  assert.equal(findGuestMock.mock.calls.length, 1);
+  assert.deepEqual(attachMock.mock.calls[0].arguments, ["room-1", "customer-1"]);
+  assert.equal(findOrCreateMock.mock.calls.length, 0);
+});
 
 test("sendMessage rejects when another worker already holds the chat lock", async (t) => {
   const io = createIoMock();

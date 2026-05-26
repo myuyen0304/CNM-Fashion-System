@@ -9,7 +9,8 @@
     "test": "node --test",
     "test:watch": "node --watch --test",
     "import:csv": "node import-csv.js",
-    "create:user": "node scripts/create-staff-user.js"
+    "create:user": "node scripts/create-staff-user.js",
+    "fix:chat-indexes": "node scripts/fix-chat-indexes.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

@@ -48,6 +48,38 @@ test("findOrCreateGuestRoom uses an atomic upsert for guest sessions", async (t)
   assert.deepEqual(filter, { guestToken: "guest-1", isGuestSession: true });
   assert.equal(update.$setOnInsert.isGuestSession, true);
   assert.equal(update.$setOnInsert.guestToken, "guest-1");
-  assert.ok(update.$setOnInsert.customerId instanceof mongoose.Types.ObjectId);
+  assert.equal(update.$setOnInsert.customerId, undefined);
   assert.deepEqual(options, { new: true, upsert: true });
+});
+
+test("ChatRoom indexes keep guest and authenticated room uniqueness separate", () => {
+  const indexes = ChatRoom.schema.indexes();
+
+  assert.ok(
+    indexes.some(
+      ([fields, options]) =>
+        fields.customerId === 1 &&
+        options.unique === true &&
+        options.partialFilterExpression?.isGuestSession === false,
+    ),
+  );
+
+  assert.ok(
+    indexes.some(
+      ([fields, options]) =>
+        fields.guestToken === 1 &&
+        options.unique === true &&
+        options.partialFilterExpression?.isGuestSession === true,
+    ),
+  );
+
+  assert.equal(
+    indexes.some(
+      ([fields, options]) =>
+        fields.customerId === 1 &&
+        options.unique === true &&
+        !options.partialFilterExpression,
+    ),
+    false,
+  );
 });

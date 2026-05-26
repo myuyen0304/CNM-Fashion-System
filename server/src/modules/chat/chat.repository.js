@@ -1,4 +1,3 @@
-const mongoose = require("mongoose");
 const { ChatRoom, ChatMessage } = require("./chat.model");
 
 const findOrCreateRoom = async (customerId) => {
@@ -30,7 +29,6 @@ const findOrCreateGuestRoom = async (guestToken) => {
       { guestToken, isGuestSession: true },
       {
         $setOnInsert: {
-          customerId: new mongoose.Types.ObjectId(),
           isGuestSession: true,
           guestToken,
         },
