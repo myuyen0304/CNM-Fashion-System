@@ -22,17 +22,17 @@ const main = async () => {
 
   await mongoose.connect(mongoUri);
 
-  const unsetResult = await ChatRoom.updateMany(
-    { isGuestSession: true, customerId: { $ne: null } },
-    { $unset: { customerId: "" } },
-  );
-
   const indexes = await ChatRoom.collection.indexes();
   const legacyIndex = indexes.find(isLegacyCustomerUniqueIndex);
   if (legacyIndex) {
     await ChatRoom.collection.dropIndex(legacyIndex.name);
     console.log(`Dropped legacy index: ${legacyIndex.name}`);
   }
+
+  const unsetResult = await ChatRoom.updateMany(
+    { isGuestSession: true, customerId: { $ne: null } },
+    { $unset: { customerId: "" } },
+  );
 
   await ChatRoom.syncIndexes();
   console.log(`Updated guest rooms: ${unsetResult.modifiedCount}`);
