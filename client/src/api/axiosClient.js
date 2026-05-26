@@ -6,6 +6,12 @@ const notifyAuthStateChanged = () => {
   window.dispatchEvent(new Event("auth-state-changed"));
 };
 
+const clearStoredAuth = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("user");
+  notifyAuthStateChanged();
+};
+
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
@@ -27,6 +33,10 @@ const AUTH_PATHS_TO_SKIP_REFRESH = [
 
 const shouldSkipRefresh = (requestUrl = "") => {
   return AUTH_PATHS_TO_SKIP_REFRESH.some((path) => requestUrl.includes(path));
+};
+
+const shouldClearAuthOnUnauthorized = (requestUrl = "") => {
+  return !String(requestUrl || "").includes("/auth/login");
 };
 
 const normalizeAuthErrorMessage = (status, requestUrl = "", message = "") => {
@@ -112,9 +122,7 @@ axiosClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return axiosClient(originalRequest);
       } catch (err) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("user");
-        notifyAuthStateChanged();
+        clearStoredAuth();
 
         // Tránh reload cứng ngay tại trang login để thông báo lỗi còn hiển thị.
         if (window.location.pathname !== "/login") {
@@ -123,6 +131,13 @@ axiosClient.interceptors.response.use(
 
         return Promise.reject(err);
       }
+    }
+
+    if (
+      error.response?.status === 401 &&
+      shouldClearAuthOnUnauthorized(originalRequest?.url)
+    ) {
+      clearStoredAuth();
     }
 
     return Promise.reject(error);
