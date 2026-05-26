@@ -1,81 +1,81 @@
 # CNM Fashion System
 
-CNM Fashion System là ứng dụng thương mại điện tử theo kiến trúc modular monolith, gồm frontend React và backend Express/MongoDB. Repository này bao phủ các luồng chính của storefront, quản lý tài khoản, giỏ hàng, đặt hàng, thanh toán VNPay, đánh giá sản phẩm, màn hình quản trị nhân sự và hệ thống chat hỗ trợ khách hàng theo thời gian thực.
+CNM Fashion System is a modular monolith e-commerce application with a React frontend and an Express/MongoDB backend. This repository covers the main storefront flows, account management, cart, ordering, VNPay payment, product reviews, staff administration screens, and real-time customer support chat.
 
-## Công nghệ sử dụng
+## Tech Stack
 
 - Frontend: React 18, Vite, React Router, TailwindCSS, Axios, Socket.IO Client
 - Backend: Node.js, Express, MongoDB, Mongoose, Socket.IO
-- Tích hợp ngoài: Cloudinary, Nodemailer, VNPay, OpenAI SDK, Anthropic SDK, Google Generative AI SDK
-- Kiểm thử: Node test runner cho backend, Vitest cho frontend
+- External integrations: Cloudinary, Nodemailer, VNPay, OpenAI SDK, Anthropic SDK, Google Generative AI SDK
+- Testing: Node test runner for the backend, Vitest for the frontend
 
-## Cấu trúc repository
+## Repository Structure
 
 ```text
 client/
   src/
-    api/          Axios client và interceptors
-    components/   UI dùng chung và route guards
-    contexts/     State dùng chung cho auth và cart
-    pages/        Các màn hình theo route
-    utils/        Helper phía frontend
+    api/          Axios client and interceptors
+    components/   Shared UI and route guards
+    contexts/     Shared auth and cart state
+    pages/        Route screens
+    utils/        Frontend helpers
 
 server/
   src/
     config/       Database, Cloudinary, Socket.IO
     modules/      auth, user, product, cart, order, payment, chat
-    review/       Module đánh giá sản phẩm
+    review/       Product review module
     shared/       Middleware, constants, utilities
-    app.js        Cấu hình Express app
-    routes.js     Đăng ký route trung tâm
-    server.js     Điểm khởi động tiến trình
+    app.js        Express app configuration
+    routes.js     Central route registration
+    server.js     Process entry point
 
 docker/
 postman/
 docs/
 ```
 
-## Tính năng chính
+## Main Features
 
-- Đăng ký, đăng nhập, refresh token, xác thực email, quên mật khẩu
-- Duyệt sản phẩm, tìm kiếm, lọc, gợi ý sản phẩm, xem chi tiết
-- Giỏ hàng và checkout
-- Lịch sử đơn hàng, chi tiết đơn, hủy đơn, quản lý đơn cho staff
-- Khởi tạo thanh toán và xử lý callback VNPay
-- Đánh giá sản phẩm và tổng hợp điểm rating
-- Chat hỗ trợ khách hàng với guest session, yêu cầu đăng nhập khi đụng dữ liệu nhạy cảm, và staff takeover
-- Màn hình staff cho dashboard, sản phẩm, đơn hàng, người dùng và support chat
+- Registration, login, refresh tokens, email verification, and password reset
+- Product browsing, search, filtering, recommendations, and detail pages
+- Cart and checkout
+- Order history, order details, order cancellation, and staff order management
+- VNPay payment initialization and callback handling
+- Product reviews and rating aggregation
+- Customer support chat with guest sessions, login requirements for sensitive data, and staff takeover
+- Staff screens for dashboard, products, orders, users, and support chat
 
-## Cấu trúc ứng dụng
+## Application Architecture
 
-Backend đi theo luồng phân lớp:
+The backend follows a layered flow:
 
 ```text
 routes -> controller -> service -> repository -> Mongoose model
 ```
 
-Frontend tổ chức theo route page trong `client/src/pages`, UI dùng chung trong `client/src/components`, và state cấp ứng dụng qua `AuthContext` và `CartContext`.
+The frontend is organized by route pages in `client/src/pages`, shared UI in `client/src/components`, and application-level state through `AuthContext` and `CartContext`.
 
-Các entry point chính:
+Main entry points:
 
 - Frontend: `client/src/main.jsx`, `client/src/App.jsx`
 - Backend: `server/src/server.js`, `server/src/app.js`, `server/src/routes.js`
 
-## Yêu cầu môi trường
+## Environment Requirements
 
-- Node.js 18 trở lên
+- Node.js 18 or later
 - npm
-- MongoDB local hoặc MongoDB Atlas
-- Tài khoản Cloudinary, SMTP, VNPay, AI provider nếu cần dùng các tích hợp tương ứng
-- Docker Desktop nếu muốn chạy bằng Docker Compose
+- Local MongoDB or MongoDB Atlas
+- Cloudinary, SMTP, VNPay, and AI provider accounts if the corresponding integrations are needed
+- Docker Desktop if you want to run the project with Docker Compose
 
-## Cấu hình biến môi trường
+## Environment Configuration
 
 ### Backend
 
-Tạo `server/.env` từ `server/.env.example`.
+Create `server/.env` from `server/.env.example`.
 
-Biến bắt buộc:
+Required variables:
 
 ```env
 MONGO_URI=
@@ -85,7 +85,7 @@ CLIENT_URL=http://localhost:5173
 PORT=5000
 ```
 
-Biến cho các tích hợp tùy chọn:
+Variables for optional integrations:
 
 ```env
 CLOUDINARY_CLOUD_NAME=
@@ -105,15 +105,15 @@ VNPAY_RETURN_URL=
 
 ### Frontend
 
-Tạo `client/.env` từ `client/.env.example`.
+Create `client/.env` from `client/.env.example`.
 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
 
-## Chạy local
+## Local Development
 
-Cài dependencies:
+Install dependencies:
 
 ```bash
 npm install
@@ -121,79 +121,79 @@ npm --prefix server install
 npm --prefix client install
 ```
 
-Chạy backend:
+Start the backend:
 
 ```bash
 cd server
 npm run dev
 ```
 
-Chạy frontend:
+Start the frontend:
 
 ```bash
 cd client
 npm run dev
 ```
 
-Địa chỉ mặc định:
+Default addresses:
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:5000`
 - Health check: `http://localhost:5000/api/health`
 
-## Truy cập khu vực quản trị
+## Staff Area Access
 
-Khu vực quản trị dùng cùng màn hình đăng nhập với người dùng thường tại:
+The staff area uses the same login screen as regular users:
 
 - `http://localhost:5173/login`
 
-Sau khi đăng nhập, quyền truy cập được phân theo role:
+After login, access is controlled by role:
 
-- `admin`: vào được ` /staff`, `/staff/orders`, `/staff/support`, `/staff/products`, `/admin/users`
-- `supervisor`: vào được ` /staff`, `/staff/orders`, `/staff/support`, `/staff/products`
-- `employee`: vào được ` /staff`, `/staff/orders`, `/staff/support`
+- `admin`: can access `/staff`, `/staff/orders`, `/staff/support`, `/staff/products`, `/admin/users`
+- `supervisor`: can access `/staff`, `/staff/orders`, `/staff/support`, `/staff/products`
+- `employee`: can access `/staff`, `/staff/orders`, `/staff/support`
 
-Nếu database chưa có tài khoản staff/admin, tạo bằng script backend:
+If the database does not have a staff or admin account yet, create one with the backend script:
 
 ```bash
 cd server
 npm run create:user -- --name="Admin CNM" --email=admin@example.com --password=StrongPass123 --role=admin
 ```
 
-Có thể thay `--role=admin` bằng `supervisor` hoặc `employee`.
+You can replace `--role=admin` with `supervisor` or `employee`.
 
-Lưu ý:
+Notes:
 
-- Script này sẽ tạo mới hoặc cập nhật user nếu email đã tồn tại.
-- User được tạo qua script sẽ được đặt `isActive = true` và `isVerified = true`.
-- Màn quản lý người dùng chỉ mở cho role `admin`.
+- This script creates a new user or updates the user if the email already exists.
+- Users created through the script are set to `isActive = true` and `isVerified = true`.
+- The user management screen is available only to the `admin` role.
 
-## Chạy bằng Docker
+## Docker
 
-Repository có sẵn `docker-compose.yml` cho môi trường phát triển. Mặc định, container `server` sẽ đọc `MONGO_URI` trực tiếp từ `server/.env`, nên có thể dùng MongoDB Atlas hoặc MongoDB ngoài Docker.
+The repository includes `docker-compose.yml` for development. By default, the `server` container reads `MONGO_URI` directly from `server/.env`, so it can use MongoDB Atlas or another MongoDB instance outside Docker.
 
-Khởi động:
+Start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-Endpoint mặc định:
+Default endpoints:
 
 - Backend: `http://localhost:5000`
 - Frontend: `http://localhost:5173`
 
-Nếu muốn chạy thêm MongoDB local trong Docker thay vì Atlas, dùng profile `local-db`:
+To run a local MongoDB container instead of using Atlas, enable the `local-db` profile:
 
 ```bash
 docker compose --profile local-db up --build
 ```
 
-Khi bật profile này, MongoDB local sẽ mở ở:
+With this profile enabled, local MongoDB is exposed at:
 
 - MongoDB: `localhost:27018`
 
-Dừng stack:
+Stop the stack:
 
 ```bash
 docker compose down
@@ -201,7 +201,7 @@ docker compose down
 
 ## Scripts
 
-### Ở thư mục gốc
+### Root
 
 ```bash
 npm test
@@ -230,17 +230,17 @@ npm test
 npm run test:watch
 ```
 
-## Kiểm thử
+## Testing
 
-Repository hiện đã có test tự động.
+This repository currently includes automated tests.
 
-- `npm test` ở root sẽ chạy cả server và client
-- Backend dùng Node built-in test runner
-- Frontend dùng Vitest
+- `npm test` from the repository root runs both server and client tests
+- The backend uses the Node built-in test runner
+- The frontend uses Vitest
 
-Nếu cần test API thủ công, dùng collection trong thư mục `postman/`.
+For manual API testing, use the collection in `postman/`.
 
-## Các nhóm API chính
+## Main API Groups
 
 - `/api/auth`
 - `/api/users`
@@ -251,12 +251,12 @@ Nếu cần test API thủ công, dùng collection trong thư mục `postman/`.
 - `/api/reviews`
 - `/api/chat`
 
-Ghi chú:
+Notes:
 
-- `GET /api/health` dùng cho health check
-- `/api/chat` cho phép guest truy cập qua optional auth; các thao tác liên quan đến đơn hàng, tài khoản hoặc dữ liệu cá nhân sẽ được kiểm soát ở tầng service
+- `GET /api/health` is used for health checks
+- `/api/chat` allows guest access through optional authentication; operations involving orders, accounts, or personal data are controlled at the service layer
 
-## Tài liệu liên quan
+## Related Documentation
 
 - `ARCHITECTURE.md`
 - `DATABASE_ERD.md`
@@ -264,13 +264,13 @@ Ghi chú:
 - `DEPLOYMENT_FREE.md`
 - `docs/`
 
-## Ghi chú phát triển
+## Development Notes
 
-- Frontend gọi API qua `client/src/api/axiosClient.js`
-- Backend đăng ký route trong `server/src/routes.js`
-- Module review hiện nằm ở `server/src/review` thay vì `server/src/modules`
-- Docker development dùng bind mount cho source, nên phần lớn thay đổi ở backend/frontend sẽ tự reload mà không cần build lại toàn bộ image
+- The frontend calls the API through `client/src/api/axiosClient.js`
+- The backend registers routes in `server/src/routes.js`
+- The review module currently lives in `server/src/review` instead of `server/src/modules`
+- Docker development uses bind mounts for source code, so most backend and frontend changes reload without rebuilding the full image
 
 ## License
 
-Repository hiện chưa có file license riêng. Nếu dự án được dùng ngoài phạm vi nội bộ hoặc coursework, nên bổ sung license rõ ràng.
+This repository does not currently include a dedicated license file. If the project is used outside internal or coursework contexts, add an explicit license.
