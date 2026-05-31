@@ -143,6 +143,7 @@ const register = async ({ name, email, password }) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
   let user = existingUser;
+  let createdNewUser = false;
 
   if (user && user.isVerified) {
     throw new ApiError(
@@ -164,6 +165,7 @@ const register = async ({ name, email, password }) => {
       password: hashedPassword,
       isVerified: false,
     });
+    createdNewUser = true;
   }
 
   const otp = await issueOtp({
@@ -187,6 +189,10 @@ const register = async ({ name, email, password }) => {
     }
 
     await authRepo.deleteOtpToken(user.email, OTP_PURPOSES.REGISTER);
+    if (createdNewUser) {
+      await authRepo.deleteUserById(user._id);
+    }
+
     throw new ApiError(
       503,
       "Không gửi được OTP xác thực. Vui lòng thử lại hoặc kiểm tra cấu hình email.",

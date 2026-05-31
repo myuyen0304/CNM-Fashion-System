@@ -59,6 +59,7 @@ const mockRegisterRepoSuccess = (t, user = createUser()) => {
     _id: "otp-1",
     ...payload,
   }));
+  t.mock.method(authRepo, "deleteUserById", async () => ({}));
   return t.mock.method(authRepo, "deleteOtpToken", async () => ({}));
 };
 
@@ -100,8 +101,9 @@ test("register returns demo OTP when email fails and fallback is enabled", async
   assert.match(result.debugOtp, /^\d{6}$/);
 });
 
-test("register rejects and deletes OTP when email fails without fallback", async (t) => {
+test("register rejects and rolls back new user when email fails without fallback", async (t) => {
   const deleteOtpMock = mockRegisterRepoSuccess(t);
+  const deleteUserMock = authRepo.deleteUserById;
   const authService = loadAuthService(t, {
     sendEmail: async () => {
       throw new Error("smtp timeout");
@@ -127,6 +129,8 @@ test("register rejects and deletes OTP when email fails without fallback", async
     "user@example.com",
     "register_verification",
   ]);
+  assert.equal(deleteUserMock.mock.calls.length, 1);
+  assert.deepEqual(deleteUserMock.mock.calls[0].arguments, ["user-1"]);
 });
 
 test("register retries an existing unverified account", async (t) => {
@@ -162,4 +166,51 @@ test("register retries an existing unverified account", async (t) => {
   assert.equal(updateUserMock.mock.calls[0].arguments[1].name, "Nguyen Van B");
   assert.equal(updateUserMock.mock.calls[0].arguments[1].isVerified, false);
   assert.equal(createUserMock.mock.calls.length, 0);
+});
+
+test("register keeps an existing unverified account when retry email fails", async (t) => {
+  const existingUser = createUser({ _id: "user-existing" });
+  t.mock.method(authRepo, "findUserByEmail", async () => existingUser);
+  t.mock.method(authRepo, "updateUser", async (_id, updates) => ({
+    ...existingUser,
+    ...updates,
+  }));
+  t.mock.method(authRepo, "createUser", async () => {
+    throw new Error("should not create a second user");
+  });
+  t.mock.method(authRepo, "findOtpToken", async () => null);
+  t.mock.method(authRepo, "upsertOtpToken", async (payload) => ({
+    _id: "otp-1",
+    ...payload,
+  }));
+  const deleteOtpMock = t.mock.method(
+    authRepo,
+    "deleteOtpToken",
+    async () => ({}),
+  );
+  const deleteUserMock = t.mock.method(authRepo, "deleteUserById", async () => {
+    throw new Error("should not delete an existing unverified user");
+  });
+
+  const authService = loadAuthService(t, {
+    sendEmail: async () => {
+      throw new Error("smtp timeout");
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      authService.register({
+        name: "Nguyen Van B",
+        email: "user@example.com",
+        password: "Password1",
+      }),
+    (error) => {
+      assert.equal(error.statusCode, 503);
+      return true;
+    },
+  );
+
+  assert.equal(deleteOtpMock.mock.calls.length, 1);
+  assert.equal(deleteUserMock.mock.calls.length, 0);
 });
