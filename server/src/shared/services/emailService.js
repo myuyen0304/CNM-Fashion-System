@@ -1,9 +1,19 @@
 const nodemailer = require("nodemailer");
 
+const DEFAULT_EMAIL_SEND_TIMEOUT_MS = 8000;
+
+const getEmailSendTimeoutMs = () => {
+  const value = Number(process.env.EMAIL_SEND_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0
+    ? value
+    : DEFAULT_EMAIL_SEND_TIMEOUT_MS;
+};
+
 const getEmailConfig = () => {
   const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 587);
   const user = process.env.EMAIL_USER || process.env.SMTP_USER;
   const pass = process.env.EMAIL_PASSWORD || process.env.SMTP_PASS;
+  const timeoutMs = getEmailSendTimeoutMs();
 
   return {
     host: process.env.EMAIL_HOST || process.env.SMTP_HOST,
@@ -12,6 +22,7 @@ const getEmailConfig = () => {
     user,
     pass,
     from: process.env.EMAIL_FROM || user,
+    timeoutMs,
   };
 };
 
@@ -22,6 +33,9 @@ const transporter = nodemailer.createTransport({
   host: emailConfig.host,
   port: emailConfig.port,
   secure: emailConfig.secure,
+  connectionTimeout: emailConfig.timeoutMs,
+  greetingTimeout: emailConfig.timeoutMs,
+  socketTimeout: emailConfig.timeoutMs,
   auth: {
     user: emailConfig.user,
     pass: emailConfig.pass,
@@ -45,10 +59,34 @@ const logMailResult = (label, mailOptions, info) => {
   }
 };
 
+const sendMailWithTimeout = async (label, mailOptions) => {
+  const timeoutMs = getEmailSendTimeoutMs();
+  let timeoutId;
+
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const error = new Error(
+        `Gửi email ${label} quá ${timeoutMs}ms. Vui lòng kiểm tra cấu hình SMTP.`,
+      );
+      error.code = "EMAIL_SEND_TIMEOUT";
+      reject(error);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([
+      transporter.sendMail(mailOptions),
+      timeoutPromise,
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 const sendMailWithDebug = async (label, mailOptions) => {
   if (process.env.NODE_ENV === "development") {
     try {
-      const info = await transporter.sendMail(mailOptions);
+      const info = await sendMailWithTimeout(label, mailOptions);
       logMailResult(label, mailOptions, info);
       return info;
     } catch (err) {
@@ -57,7 +95,7 @@ const sendMailWithDebug = async (label, mailOptions) => {
     }
   }
 
-  const info = await transporter.sendMail(mailOptions);
+  const info = await sendMailWithTimeout(label, mailOptions);
   logMailResult(label, mailOptions, info);
   return info;
 };

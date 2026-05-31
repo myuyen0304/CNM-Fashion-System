@@ -23,6 +23,12 @@ const OTP_MAX_RESENDS = Number(process.env.OTP_MAX_RESENDS || 5);
 const EMAIL_VERIFY_LINK_EXPIRES_IN =
   process.env.EMAIL_VERIFY_LINK_EXPIRES_IN || "24h";
 
+const isDemoOtpFallbackAllowed = () => {
+  return (
+    String(process.env.ALLOW_DEMO_OTP_FALLBACK || "").toLowerCase() === "true"
+  );
+};
+
 const normalizeEmail = (email) =>
   String(email || "")
     .trim()
@@ -166,7 +172,26 @@ const register = async ({ name, email, password }) => {
   });
   const verifyToken = createVerificationLinkToken(user);
 
-  await sendRegistrationOtpEmail(user.email, user.name, otp, verifyToken);
+  try {
+    await sendRegistrationOtpEmail(user.email, user.name, otp, verifyToken);
+  } catch (err) {
+    if (isDemoOtpFallbackAllowed()) {
+      return {
+        message:
+          "Đăng ký thành công nhưng email OTP chưa gửi được. Dùng OTP demo bên dưới để xác thực tài khoản.",
+        email: user.email,
+        requiresVerification: true,
+        otpDelivery: "fallback",
+        debugOtp: otp,
+      };
+    }
+
+    await authRepo.deleteOtpToken(user.email, OTP_PURPOSES.REGISTER);
+    throw new ApiError(
+      503,
+      "Không gửi được OTP xác thực. Vui lòng thử lại hoặc kiểm tra cấu hình email.",
+    );
+  }
 
   return {
     message:

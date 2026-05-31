@@ -1,0 +1,165 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const authRepo = require("./auth.repository");
+const emailService = require("../../shared/services/emailService");
+
+const authServicePath = require.resolve("./auth.service");
+
+const createUser = (overrides = {}) => ({
+  _id: "user-1",
+  name: "Nguyen Van A",
+  email: "user@example.com",
+  isActive: true,
+  isVerified: false,
+  ...overrides,
+});
+
+const loadAuthService = (t, { allowFallback = false, sendEmail } = {}) => {
+  const originalEnv = {
+    ALLOW_DEMO_OTP_FALLBACK: process.env.ALLOW_DEMO_OTP_FALLBACK,
+    JWT_SECRET: process.env.JWT_SECRET,
+    NODE_ENV: process.env.NODE_ENV,
+  };
+
+  process.env.ALLOW_DEMO_OTP_FALLBACK = allowFallback ? "true" : "false";
+  process.env.JWT_SECRET = "test-jwt-secret";
+  process.env.NODE_ENV = "test";
+
+  if (sendEmail) {
+    t.mock.method(emailService, "sendRegistrationOtpEmail", sendEmail);
+  }
+
+  delete require.cache[authServicePath];
+  const authService = require(authServicePath);
+
+  t.after(() => {
+    delete require.cache[authServicePath];
+
+    Object.entries(originalEnv).forEach(([key, value]) => {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    });
+  });
+
+  return authService;
+};
+
+const mockRegisterRepoSuccess = (t, user = createUser()) => {
+  t.mock.method(authRepo, "findUserByEmail", async () => null);
+  t.mock.method(authRepo, "createUser", async (payload) => ({
+    ...user,
+    ...payload,
+    _id: user._id,
+  }));
+  t.mock.method(authRepo, "findOtpToken", async () => null);
+  t.mock.method(authRepo, "upsertOtpToken", async (payload) => ({
+    _id: "otp-1",
+    ...payload,
+  }));
+  return t.mock.method(authRepo, "deleteOtpToken", async () => ({}));
+};
+
+test("register returns verification response when OTP email is sent", async (t) => {
+  const sendEmailMock = async () => ({ messageId: "mail-1" });
+  mockRegisterRepoSuccess(t);
+  const authService = loadAuthService(t, { sendEmail: sendEmailMock });
+
+  const result = await authService.register({
+    name: "Nguyen Van A",
+    email: "USER@example.com",
+    password: "Password1",
+  });
+
+  assert.equal(result.email, "user@example.com");
+  assert.equal(result.requiresVerification, true);
+  assert.equal(result.debugOtp, undefined);
+  assert.equal(result.otpDelivery, undefined);
+});
+
+test("register returns demo OTP when email fails and fallback is enabled", async (t) => {
+  mockRegisterRepoSuccess(t);
+  const authService = loadAuthService(t, {
+    allowFallback: true,
+    sendEmail: async () => {
+      throw new Error("smtp timeout");
+    },
+  });
+
+  const result = await authService.register({
+    name: "Nguyen Van A",
+    email: "user@example.com",
+    password: "Password1",
+  });
+
+  assert.equal(result.email, "user@example.com");
+  assert.equal(result.requiresVerification, true);
+  assert.equal(result.otpDelivery, "fallback");
+  assert.match(result.debugOtp, /^\d{6}$/);
+});
+
+test("register rejects and deletes OTP when email fails without fallback", async (t) => {
+  const deleteOtpMock = mockRegisterRepoSuccess(t);
+  const authService = loadAuthService(t, {
+    sendEmail: async () => {
+      throw new Error("smtp timeout");
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      authService.register({
+        name: "Nguyen Van A",
+        email: "user@example.com",
+        password: "Password1",
+      }),
+    (error) => {
+      assert.equal(error.statusCode, 503);
+      assert.match(error.message, /Không gửi được OTP xác thực/i);
+      return true;
+    },
+  );
+
+  assert.equal(deleteOtpMock.mock.calls.length, 1);
+  assert.deepEqual(deleteOtpMock.mock.calls[0].arguments, [
+    "user@example.com",
+    "register_verification",
+  ]);
+});
+
+test("register retries an existing unverified account", async (t) => {
+  const existingUser = createUser({ _id: "user-existing" });
+  t.mock.method(authRepo, "findUserByEmail", async () => existingUser);
+  const updateUserMock = t.mock.method(authRepo, "updateUser", async (_id, updates) => ({
+    ...existingUser,
+    ...updates,
+  }));
+  const createUserMock = t.mock.method(authRepo, "createUser", async () => {
+    throw new Error("should not create a second user");
+  });
+  t.mock.method(authRepo, "findOtpToken", async () => null);
+  t.mock.method(authRepo, "upsertOtpToken", async (payload) => ({
+    _id: "otp-1",
+    ...payload,
+  }));
+
+  const authService = loadAuthService(t, {
+    sendEmail: async () => ({ messageId: "mail-1" }),
+  });
+
+  const result = await authService.register({
+    name: "Nguyen Van B",
+    email: "user@example.com",
+    password: "Password1",
+  });
+
+  assert.equal(result.email, "user@example.com");
+  assert.equal(result.requiresVerification, true);
+  assert.equal(updateUserMock.mock.calls.length, 1);
+  assert.equal(updateUserMock.mock.calls[0].arguments[0], "user-existing");
+  assert.equal(updateUserMock.mock.calls[0].arguments[1].name, "Nguyen Van B");
+  assert.equal(updateUserMock.mock.calls[0].arguments[1].isVerified, false);
+  assert.equal(createUserMock.mock.calls.length, 0);
+});
