@@ -1,19 +1,46 @@
 const nodemailer = require("nodemailer");
 
 const DEFAULT_EMAIL_SEND_TIMEOUT_MS = 8000;
-const REQUIRED_EMAIL_CONFIG_KEYS = [
+const SMTP_REQUIRED_EMAIL_CONFIG_KEYS = [
   "host",
   "port",
   "user",
   "pass",
   "from",
 ];
+const GMAIL_API_REQUIRED_EMAIL_CONFIG_KEYS = [
+  "gmailClientId",
+  "gmailClientSecret",
+  "gmailRefreshToken",
+  "from",
+];
+const EMAIL_PROVIDERS = {
+  SMTP: "smtp",
+  GMAIL_API: "gmail-api",
+};
+const GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GMAIL_SEND_URL =
+  "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 
 const getEmailSendTimeoutMs = () => {
   const value = Number(process.env.EMAIL_SEND_TIMEOUT_MS);
   return Number.isFinite(value) && value > 0
     ? value
     : DEFAULT_EMAIL_SEND_TIMEOUT_MS;
+};
+
+const normalizeEmailProvider = () => {
+  const provider = String(process.env.EMAIL_PROVIDER || "")
+    .trim()
+    .toLowerCase();
+
+  if (provider) {
+    return provider;
+  }
+
+  return process.env.GMAIL_REFRESH_TOKEN
+    ? EMAIL_PROVIDERS.GMAIL_API
+    : EMAIL_PROVIDERS.SMTP;
 };
 
 const getEmailConfig = () => {
@@ -23,18 +50,38 @@ const getEmailConfig = () => {
   const timeoutMs = getEmailSendTimeoutMs();
 
   return {
+    provider: normalizeEmailProvider(),
     host: process.env.EMAIL_HOST || process.env.SMTP_HOST,
     port,
     secure: port === 465,
     user,
     pass,
     from: process.env.EMAIL_FROM || user,
+    gmailClientId: process.env.GMAIL_CLIENT_ID,
+    gmailClientSecret: process.env.GMAIL_CLIENT_SECRET,
+    gmailRefreshToken: process.env.GMAIL_REFRESH_TOKEN,
     timeoutMs,
   };
 };
 
+const getRequiredEmailConfigKeys = (emailConfig) => {
+  if (emailConfig.provider === EMAIL_PROVIDERS.SMTP) {
+    return SMTP_REQUIRED_EMAIL_CONFIG_KEYS;
+  }
+
+  if (emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API) {
+    return GMAIL_API_REQUIRED_EMAIL_CONFIG_KEYS;
+  }
+
+  const error = new Error(
+    `EMAIL_PROVIDER không được hỗ trợ: ${emailConfig.provider}.`,
+  );
+  error.code = "EMAIL_PROVIDER_UNSUPPORTED";
+  throw error;
+};
+
 const getMissingEmailConfigKeys = (emailConfig) => {
-  return REQUIRED_EMAIL_CONFIG_KEYS.filter((key) => {
+  return getRequiredEmailConfigKeys(emailConfig).filter((key) => {
     const value = emailConfig[key];
     return value === undefined || value === null || String(value).trim() === "";
   });
@@ -42,6 +89,8 @@ const getMissingEmailConfigKeys = (emailConfig) => {
 
 const assertEmailConfig = (emailConfig) => {
   const missingKeys = getMissingEmailConfigKeys(emailConfig);
+  const providerLabel =
+    emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API ? "Gmail API" : "SMTP";
 
   if (!process.env.CLIENT_URL) {
     missingKeys.push("CLIENT_URL");
@@ -49,7 +98,7 @@ const assertEmailConfig = (emailConfig) => {
 
   if (missingKeys.length > 0) {
     const error = new Error(
-      `Thiếu cấu hình SMTP: ${missingKeys.join(", ")}.`,
+      `Thiếu cấu hình ${providerLabel}: ${missingKeys.join(", ")}.`,
     );
     error.code = "EMAIL_CONFIG_MISSING";
     throw error;
@@ -64,7 +113,15 @@ const logEmailFailure = (label, err) => {
   );
 };
 
-const createTransporter = (emailConfig) => {
+const createTimeoutError = (label, timeoutMs) => {
+  const error = new Error(
+    `Gửi email ${label} quá ${timeoutMs}ms. Vui lòng kiểm tra cấu hình email.`,
+  );
+  error.code = "EMAIL_SEND_TIMEOUT";
+  return error;
+};
+
+const createSmtpTransporter = (emailConfig) => {
   assertEmailConfig(emailConfig);
 
   return nodemailer.createTransport({
@@ -86,6 +143,12 @@ let transporterConfigKey;
 
 const getTransporter = () => {
   const emailConfig = getEmailConfig();
+  assertEmailConfig(emailConfig);
+
+  if (emailConfig.provider !== EMAIL_PROVIDERS.SMTP) {
+    return { emailConfig, transporter: null };
+  }
+
   const configKey = [
     emailConfig.host,
     emailConfig.port,
@@ -96,7 +159,7 @@ const getTransporter = () => {
   ].join("|");
 
   if (!transporter || transporterConfigKey !== configKey) {
-    transporter = createTransporter(emailConfig);
+    transporter = createSmtpTransporter(emailConfig);
     transporterConfigKey = configKey;
   }
 
@@ -120,29 +183,173 @@ const logMailResult = (label, mailOptions, info) => {
   }
 };
 
-const sendMailWithTimeout = async (label, mailOptions) => {
-  const { transporter } = getTransporter();
+const sendSmtpMailWithTimeout = async (label, mailOptions, smtpTransporter) => {
   const timeoutMs = getEmailSendTimeoutMs();
   let timeoutId;
 
   const timeoutPromise = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
-      const error = new Error(
-        `Gửi email ${label} quá ${timeoutMs}ms. Vui lòng kiểm tra cấu hình SMTP.`,
-      );
-      error.code = "EMAIL_SEND_TIMEOUT";
-      reject(error);
+      reject(createTimeoutError(label, timeoutMs));
     }, timeoutMs);
   });
 
   try {
     return await Promise.race([
-      transporter.sendMail(mailOptions),
+      smtpTransporter.sendMail(mailOptions),
       timeoutPromise,
     ]);
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+const encodeBase64Url = (value) => {
+  return Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+};
+
+const encodeMimeHeader = (value) => {
+  return `=?UTF-8?B?${Buffer.from(String(value), "utf8").toString("base64")}?=`;
+};
+
+const sanitizeHeaderValue = (value) => {
+  return String(value || "")
+    .replace(/[\r\n]+/g, " ")
+    .trim();
+};
+
+const createRawEmail = (mailOptions) => {
+  return [
+    `From: ${sanitizeHeaderValue(mailOptions.from)}`,
+    `To: ${sanitizeHeaderValue(mailOptions.to)}`,
+    `Subject: ${encodeMimeHeader(mailOptions.subject || "")}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    String(mailOptions.html || mailOptions.text || ""),
+  ].join("\r\n");
+};
+
+const fetchJsonWithTimeout = async (url, options, timeoutMs, label) => {
+  if (typeof fetch !== "function") {
+    const error = new Error("Node runtime không hỗ trợ fetch để gọi Gmail API.");
+    error.code = "EMAIL_FETCH_UNAVAILABLE";
+    throw error;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let body = {};
+
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch (_err) {
+      body = { raw: text };
+    }
+
+    if (!response.ok) {
+      const message =
+        body.error_description ||
+        body.error?.message ||
+        body.error ||
+        body.raw ||
+        "Gmail API request failed";
+      const error = new Error(String(message));
+      error.code = "GMAIL_API_REQUEST_FAILED";
+      error.responseCode = response.status;
+      throw error;
+    }
+
+    return body;
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw createTimeoutError(label, timeoutMs);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const getGmailAccessToken = async (emailConfig) => {
+  const body = new URLSearchParams({
+    client_id: emailConfig.gmailClientId,
+    client_secret: emailConfig.gmailClientSecret,
+    refresh_token: emailConfig.gmailRefreshToken,
+    grant_type: "refresh_token",
+  });
+
+  const data = await fetchJsonWithTimeout(
+    GMAIL_TOKEN_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body,
+    },
+    emailConfig.timeoutMs,
+    "gmail-token",
+  );
+
+  if (!data.access_token) {
+    const error = new Error("Gmail API không trả access_token.");
+    error.code = "GMAIL_API_TOKEN_MISSING";
+    throw error;
+  }
+
+  return data.access_token;
+};
+
+const sendGmailApiMailWithTimeout = async (
+  label,
+  mailOptions,
+  emailConfig,
+) => {
+  const accessToken = await getGmailAccessToken(emailConfig);
+  const raw = encodeBase64Url(createRawEmail(mailOptions));
+  const data = await fetchJsonWithTimeout(
+    GMAIL_SEND_URL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ raw }),
+    },
+    emailConfig.timeoutMs,
+    label,
+  );
+
+  return {
+    accepted: [mailOptions.to],
+    rejected: [],
+    pending: [],
+    messageId: data.id,
+    response: `gmail-api:${data.id || "sent"}`,
+  };
+};
+
+const sendMailWithTimeout = async (label, mailOptions) => {
+  const { emailConfig, transporter: smtpTransporter } = getTransporter();
+
+  if (emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API) {
+    return sendGmailApiMailWithTimeout(label, mailOptions, emailConfig);
+  }
+
+  return sendSmtpMailWithTimeout(label, mailOptions, smtpTransporter);
 };
 
 const sendMailWithDebug = async (label, mailOptions) => {
