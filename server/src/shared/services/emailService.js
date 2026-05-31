@@ -14,13 +14,19 @@ const GMAIL_API_REQUIRED_EMAIL_CONFIG_KEYS = [
   "gmailRefreshToken",
   "from",
 ];
+const RESEND_REQUIRED_EMAIL_CONFIG_KEYS = [
+  "resendApiKey",
+  "from",
+];
 const EMAIL_PROVIDERS = {
   SMTP: "smtp",
   GMAIL_API: "gmail-api",
+  RESEND: "resend",
 };
 const GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GMAIL_SEND_URL =
   "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const RESEND_SEND_URL = "https://api.resend.com/emails";
 
 const getEmailSendTimeoutMs = () => {
   const value = Number(process.env.EMAIL_SEND_TIMEOUT_MS);
@@ -36,6 +42,10 @@ const normalizeEmailProvider = () => {
 
   if (provider) {
     return provider;
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    return EMAIL_PROVIDERS.RESEND;
   }
 
   return process.env.GMAIL_REFRESH_TOKEN
@@ -60,6 +70,7 @@ const getEmailConfig = () => {
     gmailClientId: process.env.GMAIL_CLIENT_ID,
     gmailClientSecret: process.env.GMAIL_CLIENT_SECRET,
     gmailRefreshToken: process.env.GMAIL_REFRESH_TOKEN,
+    resendApiKey: process.env.RESEND_API_KEY,
     timeoutMs,
   };
 };
@@ -71,6 +82,10 @@ const getRequiredEmailConfigKeys = (emailConfig) => {
 
   if (emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API) {
     return GMAIL_API_REQUIRED_EMAIL_CONFIG_KEYS;
+  }
+
+  if (emailConfig.provider === EMAIL_PROVIDERS.RESEND) {
+    return RESEND_REQUIRED_EMAIL_CONFIG_KEYS;
   }
 
   const error = new Error(
@@ -89,8 +104,12 @@ const getMissingEmailConfigKeys = (emailConfig) => {
 
 const assertEmailConfig = (emailConfig) => {
   const missingKeys = getMissingEmailConfigKeys(emailConfig);
-  const providerLabel =
-    emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API ? "Gmail API" : "SMTP";
+  const providerLabels = {
+    [EMAIL_PROVIDERS.GMAIL_API]: "Gmail API",
+    [EMAIL_PROVIDERS.RESEND]: "Resend",
+    [EMAIL_PROVIDERS.SMTP]: "SMTP",
+  };
+  const providerLabel = providerLabels[emailConfig.provider] || "email";
 
   if (!process.env.CLIENT_URL) {
     missingKeys.push("CLIENT_URL");
@@ -221,6 +240,16 @@ const sanitizeHeaderValue = (value) => {
     .trim();
 };
 
+const formatSender = (from) => {
+  const sanitizedFrom = sanitizeHeaderValue(from);
+
+  if (sanitizedFrom.includes("<")) {
+    return sanitizedFrom;
+  }
+
+  return `"E-commerce Shop" <${sanitizedFrom}>`;
+};
+
 const createRawEmail = (mailOptions) => {
   return [
     `From: ${sanitizeHeaderValue(mailOptions.from)}`,
@@ -236,7 +265,7 @@ const createRawEmail = (mailOptions) => {
 
 const fetchJsonWithTimeout = async (url, options, timeoutMs, label) => {
   if (typeof fetch !== "function") {
-    const error = new Error("Node runtime không hỗ trợ fetch để gọi Gmail API.");
+    const error = new Error("Node runtime không hỗ trợ fetch để gọi email API.");
     error.code = "EMAIL_FETCH_UNAVAILABLE";
     throw error;
   }
@@ -266,7 +295,7 @@ const fetchJsonWithTimeout = async (url, options, timeoutMs, label) => {
         body.raw ||
         "Gmail API request failed";
       const error = new Error(String(message));
-      error.code = "GMAIL_API_REQUEST_FAILED";
+      error.code = "EMAIL_API_REQUEST_FAILED";
       error.responseCode = response.status;
       throw error;
     }
@@ -342,11 +371,45 @@ const sendGmailApiMailWithTimeout = async (
   };
 };
 
+const sendResendMailWithTimeout = async (label, mailOptions, emailConfig) => {
+  const data = await fetchJsonWithTimeout(
+    RESEND_SEND_URL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${emailConfig.resendApiKey}`,
+        "Content-Type": "application/json",
+        "User-Agent": "cnm-fashion-system/1.0",
+      },
+      body: JSON.stringify({
+        from: mailOptions.from,
+        to: [mailOptions.to],
+        subject: mailOptions.subject,
+        html: mailOptions.html,
+      }),
+    },
+    emailConfig.timeoutMs,
+    label,
+  );
+
+  return {
+    accepted: [mailOptions.to],
+    rejected: [],
+    pending: [],
+    messageId: data.id,
+    response: `resend:${data.id || "sent"}`,
+  };
+};
+
 const sendMailWithTimeout = async (label, mailOptions) => {
   const { emailConfig, transporter: smtpTransporter } = getTransporter();
 
   if (emailConfig.provider === EMAIL_PROVIDERS.GMAIL_API) {
     return sendGmailApiMailWithTimeout(label, mailOptions, emailConfig);
+  }
+
+  if (emailConfig.provider === EMAIL_PROVIDERS.RESEND) {
+    return sendResendMailWithTimeout(label, mailOptions, emailConfig);
   }
 
   return sendSmtpMailWithTimeout(label, mailOptions, smtpTransporter);
@@ -382,7 +445,7 @@ const sendRegistrationOtpEmail = async (email, name, otp, token) => {
   const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${token}`;
 
   await sendMailWithDebug("register-otp", {
-    from: `"E-commerce Shop" <${emailConfig.from}>`,
+    from: formatSender(emailConfig.from),
     to: email,
     subject: "OTP xác thực tài khoản",
     html: `
@@ -412,7 +475,7 @@ const sendResetPasswordOtpEmail = async (email, name, otp) => {
   const emailConfig = getEmailConfig();
 
   await sendMailWithDebug("reset-password-otp", {
-    from: `"E-commerce Shop" <${emailConfig.from}>`,
+    from: formatSender(emailConfig.from),
     to: email,
     subject: "OTP đặt lại mật khẩu",
     html: `
