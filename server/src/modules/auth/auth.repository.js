@@ -67,6 +67,7 @@ const upsertOtpToken = async ({
   purpose,
   otpHash,
   expiresAt,
+  attempts = 0,
   resendCount,
   lastSentAt,
 }) => {
@@ -78,7 +79,7 @@ const upsertOtpToken = async ({
       purpose,
       otpHash,
       expiresAt,
-      attempts: 0,
+      attempts,
       resendCount,
       lastSentAt,
     },

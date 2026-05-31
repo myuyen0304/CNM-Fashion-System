@@ -29,6 +29,12 @@ const isDemoOtpFallbackAllowed = () => {
   );
 };
 
+const createOtpDeliveryError = () =>
+  new ApiError(
+    503,
+    "Không gửi được OTP xác thực. Vui lòng thử lại hoặc kiểm tra cấu hình email.",
+  );
+
 const normalizeEmail = (email) =>
   String(email || "")
     .trim()
@@ -132,6 +138,21 @@ const issueOtp = async ({ user, purpose }) => {
   return otp;
 };
 
+const restoreOtpToken = async (otpRecord) => {
+  if (!otpRecord) return;
+
+  await authRepo.upsertOtpToken({
+    userId: otpRecord.userId,
+    email: otpRecord.email,
+    purpose: otpRecord.purpose,
+    otpHash: otpRecord.otpHash,
+    expiresAt: otpRecord.expiresAt,
+    attempts: otpRecord.attempts,
+    resendCount: otpRecord.resendCount,
+    lastSentAt: otpRecord.lastSentAt,
+  });
+};
+
 const register = async ({ name, email, password }) => {
   const normalizedEmail = normalizeEmail(email);
   const existingUser = await authRepo.findUserByEmail(normalizedEmail);
@@ -193,10 +214,7 @@ const register = async ({ name, email, password }) => {
       await authRepo.deleteUserById(user._id);
     }
 
-    throw new ApiError(
-      503,
-      "Không gửi được OTP xác thực. Vui lòng thử lại hoặc kiểm tra cấu hình email.",
-    );
+    throw createOtpDeliveryError();
   }
 
   return {
@@ -292,13 +310,26 @@ const resendRegistrationOtp = async (email) => {
     throw new ApiError(400, "Tài khoản này đã được xác thực.");
   }
 
+  const previousOtpRecord = await authRepo.findOtpToken(
+    normalizedEmail,
+    OTP_PURPOSES.REGISTER,
+  );
   const otp = await issueOtp({
     user,
     purpose: OTP_PURPOSES.REGISTER,
   });
   const verifyToken = createVerificationLinkToken(user);
 
-  await sendRegistrationOtpEmail(user.email, user.name, otp, verifyToken);
+  try {
+    await sendRegistrationOtpEmail(user.email, user.name, otp, verifyToken);
+  } catch (_err) {
+    if (previousOtpRecord) {
+      await restoreOtpToken(previousOtpRecord);
+    } else {
+      await authRepo.deleteOtpToken(normalizedEmail, OTP_PURPOSES.REGISTER);
+    }
+    throw createOtpDeliveryError();
+  }
 
   return {
     message: "OTP xác thực mới đã được gửi đến email của bạn.",

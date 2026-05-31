@@ -38,6 +38,8 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: EMAIL_SEND_TIMEOUT_MS
+        value: 15000
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: VNPAY_TMN_CODE

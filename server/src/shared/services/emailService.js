@@ -1,6 +1,13 @@
 const nodemailer = require("nodemailer");
 
 const DEFAULT_EMAIL_SEND_TIMEOUT_MS = 8000;
+const REQUIRED_EMAIL_CONFIG_KEYS = [
+  "host",
+  "port",
+  "user",
+  "pass",
+  "from",
+];
 
 const getEmailSendTimeoutMs = () => {
   const value = Number(process.env.EMAIL_SEND_TIMEOUT_MS);
@@ -26,21 +33,75 @@ const getEmailConfig = () => {
   };
 };
 
-const emailConfig = getEmailConfig();
+const getMissingEmailConfigKeys = (emailConfig) => {
+  return REQUIRED_EMAIL_CONFIG_KEYS.filter((key) => {
+    const value = emailConfig[key];
+    return value === undefined || value === null || String(value).trim() === "";
+  });
+};
 
-// Tạo transporter 1 lần, dùng lại
-const transporter = nodemailer.createTransport({
-  host: emailConfig.host,
-  port: emailConfig.port,
-  secure: emailConfig.secure,
-  connectionTimeout: emailConfig.timeoutMs,
-  greetingTimeout: emailConfig.timeoutMs,
-  socketTimeout: emailConfig.timeoutMs,
-  auth: {
-    user: emailConfig.user,
-    pass: emailConfig.pass,
-  },
-});
+const assertEmailConfig = (emailConfig) => {
+  const missingKeys = getMissingEmailConfigKeys(emailConfig);
+
+  if (!process.env.CLIENT_URL) {
+    missingKeys.push("CLIENT_URL");
+  }
+
+  if (missingKeys.length > 0) {
+    const error = new Error(
+      `Thiếu cấu hình SMTP: ${missingKeys.join(", ")}.`,
+    );
+    error.code = "EMAIL_CONFIG_MISSING";
+    throw error;
+  }
+};
+
+const logEmailFailure = (label, err) => {
+  console.error(
+    `[Email:${label}] failed code=${err.code || "n/a"} command=${
+      err.command || "n/a"
+    } responseCode=${err.responseCode || "n/a"} message=${err.message}`,
+  );
+};
+
+const createTransporter = (emailConfig) => {
+  assertEmailConfig(emailConfig);
+
+  return nodemailer.createTransport({
+    host: emailConfig.host,
+    port: emailConfig.port,
+    secure: emailConfig.secure,
+    connectionTimeout: emailConfig.timeoutMs,
+    greetingTimeout: emailConfig.timeoutMs,
+    socketTimeout: emailConfig.timeoutMs,
+    auth: {
+      user: emailConfig.user,
+      pass: emailConfig.pass,
+    },
+  });
+};
+
+let transporter;
+let transporterConfigKey;
+
+const getTransporter = () => {
+  const emailConfig = getEmailConfig();
+  const configKey = [
+    emailConfig.host,
+    emailConfig.port,
+    emailConfig.secure,
+    emailConfig.user,
+    emailConfig.from,
+    emailConfig.timeoutMs,
+  ].join("|");
+
+  if (!transporter || transporterConfigKey !== configKey) {
+    transporter = createTransporter(emailConfig);
+    transporterConfigKey = configKey;
+  }
+
+  return { emailConfig, transporter };
+};
 
 const logMailResult = (label, mailOptions, info) => {
   if (process.env.NODE_ENV !== "development") {
@@ -60,6 +121,7 @@ const logMailResult = (label, mailOptions, info) => {
 };
 
 const sendMailWithTimeout = async (label, mailOptions) => {
+  const { transporter } = getTransporter();
   const timeoutMs = getEmailSendTimeoutMs();
   let timeoutId;
 
@@ -95,15 +157,21 @@ const sendMailWithDebug = async (label, mailOptions) => {
     }
   }
 
-  const info = await sendMailWithTimeout(label, mailOptions);
-  logMailResult(label, mailOptions, info);
-  return info;
+  try {
+    const info = await sendMailWithTimeout(label, mailOptions);
+    logMailResult(label, mailOptions, info);
+    return info;
+  } catch (err) {
+    logEmailFailure(label, err);
+    throw err;
+  }
 };
 
 /**
  * Gửi email OTP xác minh tài khoản
  */
 const sendRegistrationOtpEmail = async (email, name, otp, token) => {
+  const emailConfig = getEmailConfig();
   const verifyUrl = `${process.env.CLIENT_URL}/verify-email/${token}`;
 
   await sendMailWithDebug("register-otp", {
@@ -134,6 +202,8 @@ const sendRegistrationOtpEmail = async (email, name, otp, token) => {
  * Gửi email OTP đặt lại mật khẩu
  */
 const sendResetPasswordOtpEmail = async (email, name, otp) => {
+  const emailConfig = getEmailConfig();
+
   await sendMailWithDebug("reset-password-otp", {
     from: `"E-commerce Shop" <${emailConfig.from}>`,
     to: email,

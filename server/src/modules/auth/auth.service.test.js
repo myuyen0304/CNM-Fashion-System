@@ -214,3 +214,83 @@ test("register keeps an existing unverified account when retry email fails", asy
   assert.equal(deleteOtpMock.mock.calls.length, 1);
   assert.equal(deleteUserMock.mock.calls.length, 0);
 });
+
+test("resendRegistrationOtp restores the previous OTP when email fails", async (t) => {
+  const user = createUser();
+  const previousOtp = {
+    _id: "otp-existing",
+    userId: user._id,
+    email: user.email,
+    purpose: "register_verification",
+    otpHash: "old-hash",
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    attempts: 2,
+    resendCount: 1,
+    lastSentAt: new Date(Date.now() - 2 * 60 * 1000),
+  };
+
+  t.mock.method(authRepo, "findUserByEmail", async () => user);
+  t.mock.method(authRepo, "findOtpToken", async () => previousOtp);
+  const upsertMock = t.mock.method(authRepo, "upsertOtpToken", async (payload) => ({
+    _id: "otp-upserted",
+    ...payload,
+  }));
+  const deleteOtpMock = t.mock.method(authRepo, "deleteOtpToken", async () => {
+    throw new Error("should restore the existing token instead of deleting it");
+  });
+
+  const authService = loadAuthService(t, {
+    sendEmail: async () => {
+      throw new Error("smtp timeout");
+    },
+  });
+
+  await assert.rejects(
+    () => authService.resendRegistrationOtp(user.email),
+    (error) => {
+      assert.equal(error.statusCode, 503);
+      return true;
+    },
+  );
+
+  assert.equal(upsertMock.mock.calls.length, 2);
+  const restoredPayload = upsertMock.mock.calls[1].arguments[0];
+  assert.equal(restoredPayload.otpHash, previousOtp.otpHash);
+  assert.equal(restoredPayload.attempts, previousOtp.attempts);
+  assert.equal(restoredPayload.resendCount, previousOtp.resendCount);
+  assert.equal(restoredPayload.lastSentAt, previousOtp.lastSentAt);
+  assert.equal(deleteOtpMock.mock.calls.length, 0);
+});
+
+test("resendRegistrationOtp deletes a newly created OTP when email fails without a previous token", async (t) => {
+  const user = createUser();
+
+  t.mock.method(authRepo, "findUserByEmail", async () => user);
+  t.mock.method(authRepo, "findOtpToken", async () => null);
+  const upsertMock = t.mock.method(authRepo, "upsertOtpToken", async (payload) => ({
+    _id: "otp-new",
+    ...payload,
+  }));
+  const deleteOtpMock = t.mock.method(authRepo, "deleteOtpToken", async () => ({}));
+
+  const authService = loadAuthService(t, {
+    sendEmail: async () => {
+      throw new Error("smtp timeout");
+    },
+  });
+
+  await assert.rejects(
+    () => authService.resendRegistrationOtp(user.email),
+    (error) => {
+      assert.equal(error.statusCode, 503);
+      return true;
+    },
+  );
+
+  assert.equal(upsertMock.mock.calls.length, 1);
+  assert.equal(deleteOtpMock.mock.calls.length, 1);
+  assert.deepEqual(deleteOtpMock.mock.calls[0].arguments, [
+    user.email,
+    "register_verification",
+  ]);
+});

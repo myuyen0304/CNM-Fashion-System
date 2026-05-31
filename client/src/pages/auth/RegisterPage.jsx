@@ -4,7 +4,7 @@ import axiosClient from "../../api/axiosClient";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const REGISTER_TIMEOUT_MS = 15000;
+const REGISTER_TIMEOUT_MS = 45000;
 const COMMON_DOMAIN_TYPOS = {
   "gmail.co": "gmail.com",
   "gmail.con": "gmail.com",
@@ -21,7 +21,7 @@ const getTypoSuggestion = (email) => {
 
 const getRegisterErrorMessage = (err) => {
   if (err.code === "ECONNABORTED") {
-    return "Kết nối đăng ký quá lâu. Vui lòng thử lại sau.";
+    return "Máy chủ đang khởi động hoặc email gửi quá lâu. Vui lòng thử lại sau.";
   }
 
   if (!err.response) {
