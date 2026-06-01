@@ -19,6 +19,7 @@ const HELP_MENU_ITEMS = [
   { label: "Tuyển Dụng & Việc Làm", to: "/tuyen-dung-viec-lam" },
   { label: "Chính Sách", to: "/chinh-sach" },
 ];
+const STAFF_ROLES = new Set(["admin", "supervisor", "employee"]);
 const RESERVED_MENU_LABELS = new Set(
   BASE_MENU_ITEMS.map((item) => item.label.toLowerCase()),
 );
@@ -31,6 +32,7 @@ export default function Navbar() {
   const role = user?.role;
   const isCustomer = role === "customer";
   const isAdmin = role === "admin";
+  const isStaff = STAFF_ROLES.has(role);
   const [keyword, setKeyword] = useState("");
   const [categoryItems, setCategoryItems] = useState([]);
 
@@ -95,6 +97,19 @@ export default function Navbar() {
     navigate("/");
   };
 
+  const userMenu = isLoggedIn
+    ? {
+        avatarUrl: user?.avatarUrl || user?.avatar || "",
+        displayName: user?.name || user?.email || "User",
+        items: [
+          ...(isCustomer ? [{ to: "/orders", label: "Đơn hàng của tôi" }] : []),
+          ...(isStaff ? [{ to: "/staff", label: "Khu quản trị" }] : []),
+          { to: "/profile", label: "Thông tin cá nhân" },
+          { label: "Đăng xuất", onClick: handleLogout },
+        ],
+      }
+    : null;
+
   if (isAdmin) {
     return (
       <nav className="bg-primary text-white sticky top-0 z-50 shadow-lg">
@@ -132,19 +147,7 @@ export default function Navbar() {
               { to: "/register", label: "ĐĂNG KÝ" },
             ]
       }
-      userMenu={
-        isLoggedIn
-          ? {
-              avatarUrl: user?.avatarUrl || user?.avatar || "",
-              displayName: user?.name || "User",
-              items: [
-                { to: "/orders", label: "Đơn hàng của tôi" },
-                { to: "/profile", label: "Thông tin cá nhân" },
-                { label: "Đăng xuất", onClick: handleLogout },
-              ],
-            }
-          : null
-      }
+      userMenu={userMenu}
       showCart={!isLoggedIn || isCustomer}
       cartFirst={isCustomer}
       cartCount={isCustomer ? cartCount : 0}
