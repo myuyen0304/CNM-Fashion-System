@@ -12,6 +12,7 @@ export default function ReusableHeader({
   cartCount = 0,
   cartTo = "/cart",
   showCart = true,
+  cartFirst = false,
 }) {
   const cartLink = (
     <Link
@@ -143,17 +144,7 @@ export default function ReusableHeader({
                   </button>
                 ),
               )}
-              {showCart && (
-                <Link
-                  to={cartTo}
-                  className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
-                >
-                  GIỎ HÀNG
-                  <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
-                    {cartCount}
-                  </span>
-                </Link>
-              )}
+              {showCart && !cartFirst && cartLink}
             </div>
           </div>
 

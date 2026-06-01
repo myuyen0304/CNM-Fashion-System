@@ -15,12 +15,9 @@ export default function StaffLayout({ title, subtitle, children }) {
     "block rounded-lg px-3 py-2 text-sm font-medium transition-colors";
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
       <aside className="lg:col-span-3 xl:col-span-2">
         <div className="card p-4 lg:sticky lg:top-24">
-          <div className="text-xs text-gray-500 uppercase tracking-wide mb-3">
-            Điều Hướng Nhân Viên
-          </div>
           <nav className="space-y-1">
             <NavLink
               to="/staff"
@@ -31,7 +28,7 @@ export default function StaffLayout({ title, subtitle, children }) {
                 }`
               }
             >
-              Bảng Điều Khiển
+              DASH BOARD
             </NavLink>
             {canUsers && (
               <NavLink
@@ -88,7 +85,7 @@ export default function StaffLayout({ title, subtitle, children }) {
       <section className="lg:col-span-9 xl:col-span-10">
         <div className="mb-5">
           <h1 className="text-2xl font-bold">{title}</h1>
-          {subtitle && <p className="text-gray-600 mt-1">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-gray-600">{subtitle}</p>}
         </div>
         {children}
       </section>

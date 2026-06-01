@@ -67,6 +67,16 @@ const getRevenueSummary = catchAsync(async (req, res) => {
   res.json({ success: true, data });
 });
 
+const getProductSalesSummary = catchAsync(async (req, res) => {
+  const data = await orderService.getProductSalesSummary({
+    period: req.query.period,
+    from: req.query.from,
+    to: req.query.to,
+    limit: req.query.limit,
+  });
+  res.json({ success: true, data });
+});
+
 module.exports = {
   createOrder,
   getOrderHistory,
@@ -76,4 +86,5 @@ module.exports = {
   updateOrderStatusByStaff,
   handleReturnRequestByEmployee,
   getRevenueSummary,
+  getProductSalesSummary,
 };

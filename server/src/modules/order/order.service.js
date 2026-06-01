@@ -384,7 +384,7 @@ const handleReturnRequestByEmployee = async (orderId, actorUser, payload) => {
 };
 
 const getRevenueSummary = async ({ period, from, to }) => {
-  const normalizedPeriod = ["day", "month", "year"].includes(period)
+  const normalizedPeriod = ["day", "week", "month", "year"].includes(period)
     ? period
     : "day";
 
@@ -407,6 +407,37 @@ const getRevenueSummary = async ({ period, from, to }) => {
   };
 };
 
+const getProductSalesSummary = async ({ period, from, to, limit }) => {
+  const normalizedPeriod = ["day", "week", "month", "year"].includes(period)
+    ? period
+    : "day";
+
+  const { rows, topProducts } = await orderRepo.aggregateProductSales({
+    period: normalizedPeriod,
+    from,
+    to,
+    limit,
+  });
+
+  const totalSold = rows.reduce((sum, row) => sum + (row.totalSold || 0), 0);
+  const totalRevenue = rows.reduce(
+    (sum, row) => sum + (row.totalRevenue || 0),
+    0,
+  );
+  const totalOrders = rows.reduce((sum, row) => sum + (row.orderCount || 0), 0);
+
+  return {
+    period: normalizedPeriod,
+    from: from || null,
+    to: to || null,
+    totalSold,
+    totalRevenue,
+    totalOrders,
+    rows,
+    topProducts,
+  };
+};
+
 module.exports = {
   createOrder,
   getOrderHistory,
@@ -416,4 +447,5 @@ module.exports = {
   updateOrderStatusByStaff,
   handleReturnRequestByEmployee,
   getRevenueSummary,
+  getProductSalesSummary,
 };

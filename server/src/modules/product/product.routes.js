@@ -33,6 +33,12 @@ router.get(
   requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   productController.getCategoryManagementList,
 );
+router.get(
+  "/admin/stats",
+  protect,
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  productController.getProductStats,
+);
 router.patch(
   "/admin/categories/rename",
   protect,
