@@ -7,22 +7,6 @@ import {
   normalizeOrderStatus,
 } from "../../utils/orderStatus";
 
-const LEGACY_STATUS_TO_KEY = {
-  "Ch? thanh toÃ¡n": "pending",
-  "ÃÃ£ thanh toÃ¡n": "paid",
-  "ÄÃ£ thanh toÃ¡n": "paid",
-  "Ãang giao": "shipping",
-  "Äang giao": "shipping",
-  "HoÃ n t?t": "delivered",
-  "H?y": "cancelled",
-};
-
-const normalizeStatusKey = (status) => {
-  if (!status) return "";
-  if (STATUS_LABELS[status]) return status;
-  return LEGACY_STATUS_TO_KEY[status] || status;
-};
-
 const getItemProductId = (item) => {
   if (!item?.productId) return "";
   if (typeof item.productId === "string") return item.productId;
@@ -32,13 +16,13 @@ const getItemProductId = (item) => {
   return String(item.productId);
 };
 
-const getItemName = (item) => item?.name || item?.productId?.name || "Sáº£n pháº©m";
+const getItemName = (item) => item?.name || item?.productId?.name || "Sản phẩm";
 
 const getItemImage = (item) =>
   item?.imageUrl || item?.productId?.images?.[0] || "/placeholder.jpg";
 
 const formatMoney = (value = 0) =>
-  `${Number(value || 0).toLocaleString("vi-VN")}â‚«`;
+  `${Number(value || 0).toLocaleString("vi-VN")}₫`;
 
 export default function OrderDetailPage() {
   const { id } = useParams();
@@ -59,11 +43,11 @@ export default function OrderDetailPage() {
       const orderData = res.data.data;
       setOrder(orderData);
 
-      // Load táº¥t cáº£ reviews cá»§a user trong Ä‘Æ¡n hÃ ng nÃ y
+      // Load tất cả reviews của user trong đơn hàng này.
       try {
         const reviewRes = await axiosClient.get(`/reviews/my-order/${id}`);
         const reviews = reviewRes.data.data || [];
-        // Gáº¯n tÃªn sáº£n pháº©m tá»« order items náº¿u productId khÃ´ng populate Ä‘á»§
+        // Gắn tên sản phẩm từ order items nếu productId không populate đủ.
         const enriched = reviews.map((r) => {
           const matchItem = orderData.items.find(
             (item) =>
@@ -92,7 +76,7 @@ export default function OrderDetailPage() {
 
   const handleReviewSubmit = async () => {
     if (!reviewForm.productId) {
-      alert("Chá»n sáº£n pháº©m Ä‘á»ƒ Ä‘Ã¡nh giÃ¡");
+      alert("Chọn sản phẩm để đánh giá");
       return;
     }
 
@@ -104,25 +88,25 @@ export default function OrderDetailPage() {
         rating: reviewForm.rating,
         comment: reviewForm.comment,
       });
-      alert("Cáº£m Æ¡n báº¡n Ä‘Ã£ Ä‘Ã¡nh giÃ¡!");
+      alert("Cảm ơn bạn đã đánh giá!");
       setReviewForm({ productId: "", rating: 5, comment: "" });
-      // Refresh Ä‘á»ƒ cáº­p nháº­t lá»‹ch sá»­ Ä‘Ã¡nh giÃ¡
+      // Refresh để cập nhật lịch sử đánh giá.
       await loadData();
     } catch (err) {
-      alert(err.response?.data?.message || "Lá»—i");
+      alert(err.response?.data?.message || "Lỗi");
     } finally {
       setReviewLoading(false);
     }
   };
 
   const handleCancel = async () => {
-    if (window.confirm("XÃ¡c nháº­n há»§y Ä‘Æ¡n hÃ ng?")) {
+    if (window.confirm("Xác nhận hủy đơn hàng?")) {
       try {
         const res = await axiosClient.patch(`/orders/${id}/cancel`);
         setOrder(res.data.data);
-        alert("ÄÆ¡n hÃ ng Ä‘Ã£ Ä‘Æ°á»£c há»§y");
+        alert("Đơn hàng đã được hủy");
       } catch (err) {
-        alert(err.response?.data?.message || "Lá»—i");
+        alert(err.response?.data?.message || "Lỗi");
       }
     }
   };
@@ -137,19 +121,19 @@ export default function OrderDetailPage() {
 
       const paymentUrl = res.data?.data?.paymentUrl;
       if (!paymentUrl) {
-        throw new Error("KhÃ´ng nháº­n Ä‘Æ°á»£c Ä‘Æ°á»ng dáº«n thanh toÃ¡n");
+        throw new Error("Không nhận được đường dẫn thanh toán");
       }
 
       window.location.href = paymentUrl;
     } catch (err) {
-      alert(err.response?.data?.message || "KhÃ´ng thá»ƒ khá»Ÿi táº¡o thanh toÃ¡n");
+      alert(err.response?.data?.message || "Không thể khởi tạo thanh toán");
     } finally {
       setPaymentLoading(false);
     }
   };
 
   if (loading) return <LoadingSpinner />;
-  if (!order) return <div>KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n hÃ ng</div>;
+  if (!order) return <div>Không tìm thấy đơn hàng</div>;
 
   const shippingLines =
     order.shippingAddress && typeof order.shippingAddress === "object"
@@ -169,22 +153,22 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-6">Chi tiáº¿t Ä‘Æ¡n hÃ ng</h1>
+      <h1 className="text-3xl font-bold mb-6">Chi tiết đơn hàng</h1>
 
       {/* Order info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="card p-6">
-          <h3 className="font-bold mb-3">ThÃ´ng tin Ä‘Æ¡n hÃ ng</h3>
+          <h3 className="font-bold mb-3">Thông tin đơn hàng</h3>
           <div className="space-y-2 text-sm">
             <div>
-              <span className="text-gray-500">MÃ£ Ä‘Æ¡n:</span> {order._id}
+              <span className="text-gray-500">Mã đơn:</span> {order._id}
             </div>
             <div>
-              <span className="text-gray-500">NgÃ y Ä‘áº·t:</span>{" "}
+              <span className="text-gray-500">Ngày đặt:</span>{" "}
               {new Date(order.createdAt).toLocaleDateString("vi-VN")}
             </div>
             <div>
-              <span className="text-gray-500">Tráº¡ng thÃ¡i:</span>{" "}
+              <span className="text-gray-500">Trạng thái:</span>{" "}
               <span className="font-semibold text-primary">
                 {displayStatus}
               </span>
@@ -193,12 +177,12 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="card p-6">
-          <h3 className="font-bold mb-3">Äá»‹a chá»‰ giao hÃ ng</h3>
+          <h3 className="font-bold mb-3">Địa chỉ giao hàng</h3>
           <div className="text-sm space-y-1">
             {shippingLines.length > 0 ? (
               shippingLines.map((line, idx) => <div key={idx}>{line}</div>)
             ) : (
-              <div className="text-gray-500">ChÆ°a cÃ³ thÃ´ng tin giao hÃ ng</div>
+              <div className="text-gray-500">Chưa có thông tin giao hàng</div>
             )}
           </div>
         </div>
@@ -206,7 +190,7 @@ export default function OrderDetailPage() {
 
       {/* Items */}
       <div className="card p-6 mb-8">
-        <h3 className="font-bold mb-4">Sáº£n pháº©m</h3>
+        <h3 className="font-bold mb-4">Sản phẩm</h3>
         <div className="space-y-3">
           {order.items.map((item, idx) => {
             const productId = getItemProductId(item);
@@ -229,7 +213,7 @@ export default function OrderDetailPage() {
                     <div className="font-semibold leading-6">{itemName}</div>
                     {productId && (
                       <div className="text-xs text-gray-500 mt-1">
-                        MÃ£ SP: {productId}
+                        Mã SP: {productId}
                       </div>
                     )}
                     <div className="text-sm text-gray-500 mt-1">
@@ -240,13 +224,13 @@ export default function OrderDetailPage() {
                         to={`/products/${productId}`}
                         className="text-sm text-primary hover:underline inline-block mt-1"
                       >
-                        Xem chi tiáº¿t sáº£n pháº©m
+                        Xem chi tiết sản phẩm
                       </Link>
                     )}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm text-gray-500">ThÃ nh tiá»n</div>
+                  <div className="text-sm text-gray-500">Thành tiền</div>
                   <div className="font-semibold text-lg">
                     {formatMoney(lineTotal)}
                   </div>
@@ -261,38 +245,38 @@ export default function OrderDetailPage() {
       <div className="card p-6 mb-8">
         <div className="space-y-2 text-right">
           <div className="flex justify-between">
-            <span>Tá»•ng tiá»n hÃ ng:</span>
+            <span>Tổng tiền hàng:</span>
             <span className="font-semibold">
-              {order.subtotal.toLocaleString("vi-VN")}â‚«
+              {order.subtotal.toLocaleString("vi-VN")}₫
             </span>
           </div>
           <div className="flex justify-between">
-            <span>PhÃ­ váº­n chuyá»ƒn:</span>
+            <span>Phí vận chuyển:</span>
             <span className="font-semibold">
-              {order.shippingFee.toLocaleString("vi-VN")}â‚«
+              {order.shippingFee.toLocaleString("vi-VN")}₫
             </span>
           </div>
           <div className="flex justify-between text-lg font-bold text-primary border-t pt-2">
-            <span>Tá»•ng cá»™ng:</span>
+            <span>Tổng cộng:</span>
             <span>
-              {(order.subtotal + order.shippingFee).toLocaleString("vi-VN")}â‚«
+              {(order.subtotal + order.shippingFee).toLocaleString("vi-VN")}₫
             </span>
           </div>
         </div>
       </div>
 
-      {/* Lá»‹ch sá»­ Ä‘Ã¡nh giÃ¡ */}
+      {/* Lịch sử đánh giá */}
       {myReviews.length > 0 && (
         <div className="card p-6 mb-8">
-          <h3 className="font-bold mb-4">ÄÃ¡nh giÃ¡ cá»§a báº¡n</h3>
+          <h3 className="font-bold mb-4">Đánh giá của bạn</h3>
           <div className="space-y-4">
             {myReviews.map((r) => (
               <div key={r._id} className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-sm">{r.productName}</span>
                   <span className="text-yellow-500 text-sm">
-                    {"â˜…".repeat(r.rating)}
-                    {"â˜†".repeat(5 - r.rating)}
+                    {"★".repeat(r.rating)}
+                    {"☆".repeat(5 - r.rating)}
                   </span>
                 </div>
                 <p className="text-gray-700 text-sm mb-1">{r.comment}</p>
@@ -304,7 +288,7 @@ export default function OrderDetailPage() {
                   />
                 )}
                 <p className="text-xs text-gray-400 mt-1">
-                  ÄÃ£ Ä‘Ã¡nh giÃ¡ lÃºc:{" "}
+                  Đã đánh giá lúc:{" "}
                   {new Date(r.createdAt).toLocaleString("vi-VN", {
                     day: "2-digit",
                     month: "2-digit",
@@ -322,12 +306,12 @@ export default function OrderDetailPage() {
       {/* Review section */}
       {isReviewableStatus && (
         <div className="card p-6 mb-8">
-          <h3 className="font-bold mb-4">ÄÃ¡nh giÃ¡ sáº£n pháº©m</h3>
+          <h3 className="font-bold mb-4">Đánh giá sản phẩm</h3>
 
           <div className="space-y-4 mb-6">
             <div>
               <label className="block text-sm font-semibold mb-2">
-                Chá»n sáº£n pháº©m
+                Chọn sản phẩm
               </label>
               <select
                 value={reviewForm.productId}
@@ -336,7 +320,7 @@ export default function OrderDetailPage() {
                 }
                 className="input-field"
               >
-                <option value="">-- Chá»n sáº£n pháº©m --</option>
+                <option value="">-- Chọn sản phẩm --</option>
                 {order.items.map((item, idx) => {
                   const productId = getItemProductId(item);
                   if (!productId) return null;
@@ -355,7 +339,7 @@ export default function OrderDetailPage() {
 
             <div>
               <label className="block text-sm font-semibold mb-2">
-                ÄÃ¡nh giÃ¡ (sao)
+                Đánh giá (sao)
               </label>
               <select
                 value={reviewForm.rating}
@@ -369,7 +353,7 @@ export default function OrderDetailPage() {
               >
                 {[1, 2, 3, 4, 5].map((n) => (
                   <option key={n} value={n}>
-                    {"â˜…".repeat(n)} ({n} sao)
+                    {"★".repeat(n)} ({n} sao)
                   </option>
                 ))}
               </select>
@@ -377,7 +361,7 @@ export default function OrderDetailPage() {
 
             <div>
               <label className="block text-sm font-semibold mb-2">
-                Nháº­n xÃ©t
+                Nhận xét
               </label>
               <textarea
                 rows="3"
@@ -385,7 +369,7 @@ export default function OrderDetailPage() {
                 onChange={(e) =>
                   setReviewForm({ ...reviewForm, comment: e.target.value })
                 }
-                placeholder="Chia sáº» nháº­n xÃ©t cá»§a báº¡n..."
+                placeholder="Chia sẻ nhận xét của bạn..."
                 className="input-field"
               />
             </div>
@@ -395,7 +379,7 @@ export default function OrderDetailPage() {
               disabled={reviewLoading}
               className="btn-primary w-full disabled:opacity-50"
             >
-              {reviewLoading ? "Äang gá»­i..." : "Gá»­i Ä‘Ã¡nh giÃ¡"}
+              {reviewLoading ? "Đang gửi..." : "Gửi đánh giá"}
             </button>
           </div>
         </div>
@@ -411,11 +395,11 @@ export default function OrderDetailPage() {
               className="btn-primary w-full disabled:opacity-50"
             >
               {paymentLoading
-                ? "Äang chuyá»ƒn Ä‘áº¿n thanh toÃ¡n..."
-                : "Thanh toÃ¡n ngay"}
+                ? "Đang chuyển đến thanh toán..."
+                : "Thanh toán ngay"}
             </button>
             <button onClick={handleCancel} className="btn-secondary w-full">
-              Há»§y Ä‘Æ¡n hÃ ng
+              Hủy đơn hàng
             </button>
           </div>
         </div>
