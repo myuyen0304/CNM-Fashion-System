@@ -102,7 +102,7 @@ export default function SupportChatPage() {
   return (
     <StaffLayout
       title="Employee - Customer Support"
-      subtitle="Nhan phong chat va phan hoi khach hang theo thoi gian thuc"
+      subtitle="Nhận phòng chat và phàn hồi khách hàng theo thời gian thực"
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-4 lg:col-span-1">
