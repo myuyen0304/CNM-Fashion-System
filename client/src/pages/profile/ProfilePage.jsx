@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import axiosClient from "../../api/axiosClient";
 import { useAuth } from "../../contexts/AuthContext";
 
 export default function ProfilePage() {
-  const { user, logout, syncUser } = useAuth();
+  const { user, syncUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState("info");
   const [error, setError] = useState("");
@@ -273,16 +273,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Logout */}
-      <button
-        onClick={() => {
-          logout();
-          window.location.href = "/login";
-        }}
-        className="btn-secondary w-full mt-8"
-      >
-        Đăng xuất
-      </button>
     </div>
   );
 }

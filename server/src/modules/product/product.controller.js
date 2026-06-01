@@ -172,6 +172,14 @@ const getCategoryManagementList = catchAsync(async (_req, res) => {
   res.json({ success: true, data });
 });
 
+const getProductStats = catchAsync(async (req, res) => {
+  const data = await productService.getProductStats({
+    limit: req.query.limit,
+    lowStockThreshold: req.query.lowStockThreshold,
+  });
+  res.json({ success: true, data });
+});
+
 const renameCategory = catchAsync(async (req, res) => {
   const result = await productService.renameCategory(req.body);
   res.json({ success: true, data: result });
@@ -200,6 +208,7 @@ module.exports = {
   getAllProducts,
   updateStock,
   getCategoryManagementList,
+  getProductStats,
   renameCategory,
   deleteCategory,
 };

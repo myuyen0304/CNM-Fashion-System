@@ -25,7 +25,7 @@ export default function ProductsManagementPage() {
       setProducts(data.products || []);
       setTotalPages(data.totalPages || 1);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load products");
+      alert(err.response?.data?.message || "Không thể tải sản phẩm");
     } finally {
       setLoading(false);
     }
@@ -36,7 +36,7 @@ export default function ProductsManagementPage() {
       const res = await axiosClient.get("/products/admin/categories");
       setCategories(res.data?.data || []);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load categories");
+      alert(err.response?.data?.message || "Không thể tải danh mục");
     }
   };
 
@@ -54,13 +54,13 @@ export default function ProductsManagementPage() {
       await axiosClient.patch(`/products/${productId}/stock`, { stock });
       loadProducts(page);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot update stock");
+      alert(err.response?.data?.message || "Không thể cập nhật tồn kho");
     }
   };
 
   const handleRenameCategory = async () => {
     if (!renameFrom || !renameTo) return;
-    if (!window.confirm(`Rename category "${renameFrom}" to "${renameTo}"?`))
+    if (!window.confirm(`Đổi tên danh mục "${renameFrom}" thành "${renameTo}"?`))
       return;
     try {
       await axiosClient.patch("/products/admin/categories/rename", {
@@ -72,7 +72,7 @@ export default function ProductsManagementPage() {
       loadProducts(page);
       loadCategories();
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot rename category");
+      alert(err.response?.data?.message || "Không thể đổi tên danh mục");
     }
   };
 
@@ -80,8 +80,8 @@ export default function ProductsManagementPage() {
     if (!deleteName) return;
     if (
       !window.confirm(
-        `Delete category "${deleteName}" and move products to "${
-          moveTo || "Khac"
+        `Xóa danh mục "${deleteName}" và chuyển sản phẩm sang "${
+          moveTo || "Khác"
         }"?`,
       )
     )
@@ -95,7 +95,7 @@ export default function ProductsManagementPage() {
       loadProducts(page);
       loadCategories();
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot delete category");
+      alert(err.response?.data?.message || "Không thể xóa danh mục");
     }
   };
 
@@ -110,69 +110,69 @@ export default function ProductsManagementPage() {
 
   return (
     <StaffLayout
-      title="Supervisor - Products & Inventory"
+      title="Quản Lý Sản Phẩm & Hàng Tồn Kho"
       subtitle="Quản lý tồn kho và danh mục sản phẩm"
     >
       <div className="card p-4 mb-4">
         <div className="flex gap-2">
           <input
             className="input-field"
-            placeholder="Search in current page by product/category"
+            placeholder="Tìm kiếm theo tên sản phẩm/danh mục"
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
           />
           <button className="btn-secondary" onClick={() => setKeyword("")}>
-            Clear
+            Xóa
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="card p-4">
-          <h2 className="font-semibold mb-3">Rename category</h2>
+          <h2 className="font-semibold mb-3">Đổi Tên Danh Mục</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input
               className="input-field"
-              placeholder="From category"
+              placeholder="Từ danh mục"
               value={renameFrom}
               onChange={(e) => setRenameFrom(e.target.value)}
             />
             <input
               className="input-field"
-              placeholder="To category"
+              placeholder="Sang danh mục"
               value={renameTo}
               onChange={(e) => setRenameTo(e.target.value)}
             />
             <button className="btn-primary" onClick={handleRenameCategory}>
-              Rename
+              Đổi Tên
             </button>
           </div>
         </div>
 
         <div className="card p-4">
-          <h2 className="font-semibold mb-3">Delete category (optional move)</h2>
+          <h2 className="font-semibold mb-3">Xóa Danh Mục (Tùy Chọn Chuyển)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <input
               className="input-field"
-              placeholder="Delete category"
+              placeholder="Xóa danh mục"
               value={deleteName}
               onChange={(e) => setDeleteName(e.target.value)}
             />
             <input
               className="input-field"
-              placeholder="Move products to (optional)"
+              placeholder="Chuyển sản phẩm đến (tùy chọn)"
               value={moveTo}
               onChange={(e) => setMoveTo(e.target.value)}
             />
             <button className="btn-danger" onClick={handleDeleteCategory}>
-              Delete
+              Xóa
             </button>
           </div>
         </div>
       </div>
 
       <div className="card p-4 mb-6">
-        <h2 className="font-semibold mb-3">Current categories</h2>
+        <h2 className="font-semibold mb-3">Danh Mục Hiện Tại</h2>
         <div className="flex flex-wrap gap-2">
           {categories.map((item) => (
             <span
@@ -189,12 +189,12 @@ export default function ProductsManagementPage() {
         <table className="w-full min-w-[940px]">
           <thead>
             <tr className="border-b">
-              <th className="text-left py-3 px-4">Product</th>
-              <th className="text-left py-3 px-4">Category</th>
-              <th className="text-left py-3 px-4">Price</th>
-              <th className="text-left py-3 px-4">Stock</th>
-              <th className="text-left py-3 px-4">Status</th>
-              <th className="text-left py-3 px-4">Update stock</th>
+              <th className="text-left py-3 px-4">Sản Phẩm</th>
+              <th className="text-left py-3 px-4">Danh Mục</th>
+              <th className="text-left py-3 px-4">Giá</th>
+              <th className="text-left py-3 px-4">Tồn Kho</th>
+              <th className="text-left py-3 px-4">Trạng Thái</th>
+              <th className="text-left py-3 px-4">Cập Nhật Tồn Kho</th>
             </tr>
           </thead>
           <tbody>
@@ -241,7 +241,7 @@ export default function ProductsManagementPage() {
             disabled={page <= 1}
             onClick={() => setPage((prev) => prev - 1)}
           >
-            Prev
+            Trước
           </button>
           <span>
             {page} / {totalPages}
@@ -251,7 +251,7 @@ export default function ProductsManagementPage() {
             disabled={page >= totalPages}
             onClick={() => setPage((prev) => prev + 1)}
           >
-            Next
+            Tiếp Theo
           </button>
         </div>
       )}

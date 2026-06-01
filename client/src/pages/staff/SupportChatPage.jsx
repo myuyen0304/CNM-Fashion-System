@@ -33,7 +33,7 @@ export default function SupportChatPage() {
         if (found) setSelectedRoom(found);
       }
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load support rooms");
+      alert(err.response?.data?.message || "Không thể tải phòng hỗ trợ");
     } finally {
       setLoadingRooms(false);
     }
@@ -46,7 +46,7 @@ export default function SupportChatPage() {
       const res = await axiosClient.get(`/chat/admin/rooms/${roomId}/messages`);
       setMessages(res.data?.data?.messages || []);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot load messages");
+      alert(err.response?.data?.message || "Không thể tải tin nhắn");
     } finally {
       setLoadingMessages(false);
     }
@@ -75,7 +75,7 @@ export default function SupportChatPage() {
       loadRooms(keyword);
       loadMessages(roomId);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot assign room");
+      alert(err.response?.data?.message || "Không thể gán phòng");
     }
   };
 
@@ -89,7 +89,7 @@ export default function SupportChatPage() {
       loadMessages(selectedRoomId);
       loadRooms(keyword);
     } catch (err) {
-      alert(err.response?.data?.message || "Cannot send message");
+      alert(err.response?.data?.message || "Không thể gửi tin nhắn");
     }
   };
 
@@ -109,22 +109,22 @@ export default function SupportChatPage() {
           <div className="flex gap-2 mb-3">
             <input
               className="input-field"
-              placeholder="Search customer"
+              placeholder="Tìm kiếm khách hàng"
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
             />
             <button className="btn-secondary" onClick={() => loadRooms(keyword)}>
-              Search
+              Tìm Kiếm
             </button>
             <button className="btn-primary" onClick={() => loadRooms(keyword)}>
-              Refresh
+              Làm Mới
             </button>
           </div>
 
           {loadingRooms ? (
-            <div className="py-8 text-center text-gray-500">Loading rooms...</div>
+            <div className="py-8 text-center text-gray-500">Đang tải phòng...</div>
           ) : rooms.length === 0 ? (
-            <div className="py-8 text-center text-gray-500">No support room</div>
+            <div className="py-8 text-center text-gray-500">Không có phòng hỗ trợ</div>
           ) : (
             <div className="space-y-2 max-h-[520px] overflow-auto">
               {rooms.map((room) => (
@@ -141,7 +141,7 @@ export default function SupportChatPage() {
                   <div className="text-xs text-gray-500">{renderCustomerEmail(room)}</div>
                   <div className="text-xs text-gray-600 mt-1">Status: {room.status}</div>
                   <div className="text-xs text-gray-500 truncate mt-1">
-                    {room.lastMessage || "No message yet"}
+                    {room.lastMessage || "Chưa có tin nhắn"}
                   </div>
                 </button>
               ))}
@@ -152,7 +152,7 @@ export default function SupportChatPage() {
         <div className="card p-4 lg:col-span-2 flex flex-col min-h-[560px]">
           {!selectedRoom ? (
             <div className="flex-1 grid place-items-center text-gray-500">
-              Select a room to start support
+              Chọn một phòng để bắt đầu hỗ trợ
             </div>
           ) : (
             <>
@@ -167,15 +167,15 @@ export default function SupportChatPage() {
                   className="btn-primary text-sm"
                   onClick={() => assignToMe(selectedRoom._id)}
                 >
-                  Assign To Me
+                  Gán Cho Tôi
                 </button>
               </div>
 
               <div className="flex-1 overflow-auto space-y-3 pr-1">
                 {loadingMessages ? (
-                  <div className="py-10 text-center text-gray-500">Loading messages...</div>
+                  <div className="py-10 text-center text-gray-500">Đang tải tin nhắn...</div>
                 ) : messages.length === 0 ? (
-                  <div className="py-10 text-center text-gray-500">No message</div>
+                  <div className="py-10 text-center text-gray-500">Chưa có tin nhắn</div>
                 ) : (
                   messages.map((msg) => (
                     <div
@@ -196,13 +196,13 @@ export default function SupportChatPage() {
               <div className="border-t pt-3 mt-3 flex gap-2">
                 <input
                   className="input-field flex-1"
-                  placeholder="Type support reply..."
+                  placeholder="Nhập trả lời hỗ trợ..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 />
                 <button className="btn-primary" onClick={sendMessage}>
-                  Send
+                  Gửi
                 </button>
               </div>
             </>

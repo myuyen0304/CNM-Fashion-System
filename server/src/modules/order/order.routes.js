@@ -25,6 +25,11 @@ router.get(
   requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
   orderController.getRevenueSummary,
 );
+router.get(
+  "/admin/product-sales-summary",
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  orderController.getProductSalesSummary,
+);
 
 // Customer routes
 router.post("/", orderController.createOrder);

@@ -2,6 +2,27 @@
 const mongoose = require("mongoose");
 const { ORDER_STATUS } = require("../../shared/constants");
 
+const LEGACY_ORDER_STATUS = {
+  PENDING: "Ch? thanh toán",
+  PAID: "Ðã thanh toán",
+  SHIPPING: "Ðang giao",
+  COMPLETED: "Hoàn t?t",
+  CANCELLED: "H?y",
+};
+
+const ORDER_STATUS_ALIASES = {
+  [ORDER_STATUS.PENDING]: [ORDER_STATUS.PENDING, LEGACY_ORDER_STATUS.PENDING],
+  [ORDER_STATUS.PAID]: [ORDER_STATUS.PAID, LEGACY_ORDER_STATUS.PAID],
+  [ORDER_STATUS.SHIPPING]: [ORDER_STATUS.SHIPPING, LEGACY_ORDER_STATUS.SHIPPING],
+  [ORDER_STATUS.COMPLETED]: [ORDER_STATUS.COMPLETED, LEGACY_ORDER_STATUS.COMPLETED],
+  [ORDER_STATUS.CANCELLED]: [ORDER_STATUS.CANCELLED, LEGACY_ORDER_STATUS.CANCELLED],
+};
+
+const resolveStatusFilter = (status) => {
+  if (!status) return [];
+  return ORDER_STATUS_ALIASES[status] || [status];
+};
+
 const createOrder = async (orderData, options = {}) => {
   const order = new Order(orderData);
   return order.save(options.session ? { session: options.session } : undefined);
@@ -45,7 +66,10 @@ const findAllOrders = async ({
   const skip = (page - 1) * limit;
   const filter = {};
 
-  if (status) filter.status = status;
+  if (status) {
+    const statuses = resolveStatusFilter(status);
+    filter.status = statuses.length > 1 ? { $in: statuses } : statuses[0];
+  }
   if (paymentMethod) filter.paymentMethod = paymentMethod;
   if (from || to) {
     filter.createdAt = {};
@@ -104,7 +128,12 @@ const findOrderByTransactionId = async (transactionId) => {
 
 const aggregateRevenue = async ({ period = "day", from, to }) => {
   const match = {
-    status: { $in: [ORDER_STATUS.PAID, ORDER_STATUS.COMPLETED] },
+    status: {
+      $in: [
+        ...resolveStatusFilter(ORDER_STATUS.PAID),
+        ...resolveStatusFilter(ORDER_STATUS.COMPLETED),
+      ],
+    },
   };
 
   if (from || to) {
@@ -114,7 +143,13 @@ const aggregateRevenue = async ({ period = "day", from, to }) => {
   }
 
   const dateToStringFormat =
-    period === "year" ? "%Y" : period === "month" ? "%Y-%m" : "%Y-%m-%d";
+    period === "year"
+      ? "%Y"
+      : period === "month"
+        ? "%Y-%m"
+        : period === "week"
+          ? "%Y-W%U"
+          : "%Y-%m-%d";
 
   return Order.aggregate([
     { $match: match },
@@ -142,6 +177,113 @@ const aggregateRevenue = async ({ period = "day", from, to }) => {
       },
     },
   ]);
+};
+
+const getDateBucketFormat = (period) =>
+  period === "year"
+    ? "%Y"
+    : period === "month"
+      ? "%Y-%m"
+      : period === "week"
+        ? "%Y-W%U"
+        : "%Y-%m-%d";
+
+const buildPaidCompletedMatch = ({ from, to } = {}) => {
+  const match = {
+    status: {
+      $in: [
+        ...resolveStatusFilter(ORDER_STATUS.PAID),
+        ...resolveStatusFilter(ORDER_STATUS.COMPLETED),
+      ],
+    },
+  };
+
+  if (from || to) {
+    match.createdAt = {};
+    if (from) match.createdAt.$gte = new Date(from);
+    if (to) match.createdAt.$lte = new Date(to);
+  }
+
+  return match;
+};
+
+const aggregateProductSales = async ({ period = "day", from, to, limit = 8 }) => {
+  const match = buildPaidCompletedMatch({ from, to });
+  const dateToStringFormat = getDateBucketFormat(period);
+  const normalizedLimit = Math.min(Math.max(Number(limit) || 8, 1), 20);
+
+  const [rows, topProducts] = await Promise.all([
+    Order.aggregate([
+      { $match: match },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: {
+            bucket: {
+              $dateToString: {
+                format: dateToStringFormat,
+                date: "$createdAt",
+              },
+            },
+          },
+          totalSold: { $sum: { $ifNull: ["$items.quantity", 1] } },
+          totalRevenue: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$items.unitPrice", 0] },
+                { $ifNull: ["$items.quantity", 1] },
+              ],
+            },
+          },
+          orderCount: { $addToSet: "$_id" },
+        },
+      },
+      { $sort: { "_id.bucket": 1 } },
+      {
+        $project: {
+          _id: 0,
+          bucket: "$_id.bucket",
+          totalSold: 1,
+          totalRevenue: 1,
+          orderCount: { $size: "$orderCount" },
+        },
+      },
+    ]),
+    Order.aggregate([
+      { $match: match },
+      { $unwind: "$items" },
+      {
+        $group: {
+          _id: "$items.productId",
+          name: { $last: "$items.name" },
+          totalSold: { $sum: { $ifNull: ["$items.quantity", 1] } },
+          totalRevenue: {
+            $sum: {
+              $multiply: [
+                { $ifNull: ["$items.unitPrice", 0] },
+                { $ifNull: ["$items.quantity", 1] },
+              ],
+            },
+          },
+          orderCount: { $addToSet: "$_id" },
+        },
+      },
+      { $sort: { totalSold: -1, totalRevenue: -1 } },
+      { $limit: normalizedLimit },
+      {
+        $project: {
+          _id: 0,
+          productId: "$_id",
+          name: 1,
+          totalSold: 1,
+          totalRevenue: 1,
+          orderCount: { $size: "$orderCount" },
+        },
+      },
+    ]),
+  ]);
+
+  return { rows, topProducts };
 };
 
 const findRecentOrderItemsByCustomer = async (customerId, limit = 80) => {
@@ -204,6 +346,7 @@ module.exports = {
   updateReturnRequest,
   findOrderByTransactionId,
   aggregateRevenue,
+  aggregateProductSales,
   findRecentOrderItemsByCustomer,
   aggregateCoPurchasedProducts,
 };

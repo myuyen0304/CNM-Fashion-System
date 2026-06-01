@@ -12,7 +12,20 @@ export default function ReusableHeader({
   cartCount = 0,
   cartTo = "/cart",
   showCart = true,
+  cartFirst = false,
 }) {
+  const cartLink = (
+    <Link
+      to={cartTo}
+      className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+    >
+      GIỎ HÀNG
+      <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
+        {cartCount}
+      </span>
+    </Link>
+  );
+
   return (
     <header className="bg-white text-black border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4">
@@ -102,12 +115,17 @@ export default function ReusableHeader({
             </div>
 
             <div className="hidden md:flex items-center gap-5">
+              {showCart && cartFirst && cartLink}
               {rightLinks.map((item) =>
                 item.to ? (
                   <Link
                     key={`${item.to}-${item.label}`}
                     to={item.to}
-                    className="text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                    className={
+                      item.variant === "danger"
+                        ? "text-xs font-semibold uppercase tracking-wide px-3 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
+                        : "text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                    }
                   >
                     {item.label}
                   </Link>
@@ -116,23 +134,17 @@ export default function ReusableHeader({
                     key={item.label}
                     type="button"
                     onClick={item.onClick}
-                    className="text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                    className={
+                      item.variant === "danger"
+                        ? "text-xs font-semibold uppercase tracking-wide px-3 py-2 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
+                        : "text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                    }
                   >
                     {item.label}
                   </button>
                 ),
               )}
-              {showCart && (
-                <Link
-                  to={cartTo}
-                  className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
-                >
-                  GIỎ HÀNG
-                  <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
-                    {cartCount}
-                  </span>
-                </Link>
-              )}
+              {showCart && !cartFirst && cartLink}
             </div>
           </div>
 

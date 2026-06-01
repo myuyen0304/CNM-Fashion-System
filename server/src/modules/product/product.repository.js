@@ -521,6 +521,94 @@ const listCategoriesWithCount = async () => {
     .filter((row) => row.name);
 };
 
+const getProductStats = async ({ limit = 8, lowStockThreshold = 10 } = {}) => {
+  const normalizedLimit = Math.min(Math.max(Number(limit) || 8, 1), 20);
+  const normalizedLowStockThreshold = Math.max(
+    Number(lowStockThreshold) || 10,
+    0,
+  );
+
+  const [summaryRows, topProducts] = await Promise.all([
+    Product.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalProducts: { $sum: 1 },
+          activeProducts: {
+            $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] },
+          },
+          inactiveProducts: {
+            $sum: { $cond: [{ $eq: ["$status", "inactive"] }, 1, 0] },
+          },
+          lowStockProducts: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $eq: ["$status", "active"] },
+                    { $lte: ["$stock", normalizedLowStockThreshold] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+          totalStock: { $sum: { $ifNull: ["$stock", 0] } },
+          totalSold: { $sum: { $ifNull: ["$soldCount", 0] } },
+        },
+      },
+    ]),
+    Product.aggregate([
+      {
+        $addFields: {
+          estimatedRevenue: {
+            $multiply: [
+              { $ifNull: ["$price", 0] },
+              { $ifNull: ["$soldCount", 0] },
+            ],
+          },
+        },
+      },
+      {
+        $sort: {
+          soldCount: -1,
+          estimatedRevenue: -1,
+          viewCount: -1,
+          stock: 1,
+        },
+      },
+      { $limit: normalizedLimit },
+      {
+        $project: {
+          name: 1,
+          category: 1,
+          price: 1,
+          stock: 1,
+          status: 1,
+          soldCount: 1,
+          viewCount: 1,
+          avgRating: 1,
+          estimatedRevenue: 1,
+        },
+      },
+    ]),
+  ]);
+
+  return {
+    summary: summaryRows[0] || {
+      totalProducts: 0,
+      activeProducts: 0,
+      inactiveProducts: 0,
+      lowStockProducts: 0,
+      totalStock: 0,
+      totalSold: 0,
+    },
+    topProducts,
+    lowStockThreshold: normalizedLowStockThreshold,
+  };
+};
+
 const renameCategory = async (fromName, toName) => {
   return Product.updateMany(
     { category: { $regex: `^${escapeRegExp(fromName)}$`, $options: "i" } },
@@ -562,6 +650,7 @@ module.exports = {
   findAll,
   updateStock,
   listCategoriesWithCount,
+  getProductStats,
   renameCategory,
   removeCategory,
 };

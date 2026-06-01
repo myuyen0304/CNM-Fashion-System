@@ -21,7 +21,6 @@ import FashionNewsPage from "./pages/product/FashionNewsPage";
 import SearchPage from "./pages/product/SearchPage";
 import ProductDetailPage from "./pages/product/ProductDetailPage";
 import AboutUsPage from "./pages/help/AboutUsPage";
-import CustomerSupportPage from "./pages/help/CustomerSupportPage";
 import CareersPage from "./pages/help/CareersPage";
 import PolicyPage from "./pages/help/PolicyPage";
 import CartPage from "./pages/cart/CartPage";
@@ -89,7 +88,7 @@ function App() {
                 <Route path="/ve-chung-toi" element={<AboutUsPage />} />
                 <Route
                   path="/cham-soc-khach-hang"
-                  element={<CustomerSupportPage />}
+                  element={<Navigate to="/chat" replace />}
                 />
                 <Route path="/tuyen-dung-viec-lam" element={<CareersPage />} />
                 <Route path="/chinh-sach" element={<PolicyPage />} />

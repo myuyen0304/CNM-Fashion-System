@@ -345,6 +345,10 @@ const getCategoryManagementList = async () => {
   return productRepo.listCategoriesWithCount();
 };
 
+const getProductStats = async ({ limit, lowStockThreshold } = {}) => {
+  return productRepo.getProductStats({ limit, lowStockThreshold });
+};
+
 const renameCategory = async ({ fromName, toName }) => {
   const from = String(fromName || "").trim();
   const to = String(toName || "").trim();
@@ -393,6 +397,7 @@ module.exports = {
   getAllProducts,
   updateProductStock,
   getCategoryManagementList,
+  getProductStats,
   renameCategory,
   deleteCategory,
 };
