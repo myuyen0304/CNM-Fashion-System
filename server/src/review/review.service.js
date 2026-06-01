@@ -1,10 +1,10 @@
-const ApiError = require("../../shared/utils/ApiError");
-const { ORDER_STATUS } = require("../../shared/constants");
+const ApiError = require("../shared/utils/ApiError");
+const { ORDER_STATUS } = require("../shared/constants");
 const reviewRepo = require("./review.repository");
-const orderRepo = require("../order/order.repository");
-const Product = require("../product/product.model");
-const productRepo = require("../product/product.repository");
-const { uploadToCloudinary } = require("../../config/cloudinary");
+const orderRepo = require("../modules/order/order.repository");
+const Product = require("../modules/product/product.model");
+const productRepo = require("../modules/product/product.repository");
+const { uploadToCloudinary } = require("../config/cloudinary");
 
 /**
  * UC-09: Đánh giá sản phẩm

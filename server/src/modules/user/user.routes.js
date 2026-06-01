@@ -13,7 +13,11 @@ router.put("/change-password", userController.changePassword);
 
 // Admin: phân quyền + quản lý người dùng
 router.get("/", requireRole(ROLES.ADMIN), userController.listUsers);
-router.patch("/:id/role", requireRole(ROLES.ADMIN), userController.updateUserRole);
+router.patch(
+  "/:id/role",
+  requireRole(ROLES.ADMIN),
+  userController.updateUserRole,
+);
 router.patch(
   "/:id/active-status",
   requireRole(ROLES.ADMIN),
@@ -21,4 +25,3 @@ router.patch(
 );
 
 module.exports = router;
-

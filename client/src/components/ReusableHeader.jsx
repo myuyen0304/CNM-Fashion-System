@@ -12,8 +12,6 @@ export default function ReusableHeader({
   cartCount = 0,
   cartTo = "/cart",
   showCart = true,
-  cartFirst = false,
-  userMenu = null,
 }) {
   const cartLink = (
     <Link
@@ -145,53 +143,16 @@ export default function ReusableHeader({
                   </button>
                 ),
               )}
-              {showCart && !cartFirst && cartLink}
-
-              {userMenu && (
-                <div className="relative group">
-                  <button
-                    type="button"
-                    className="w-10 h-10 rounded-full border border-gray-300 overflow-hidden bg-gray-100 hover:border-primary transition grid place-items-center"
-                    aria-label="user-menu"
-                  >
-                    {userMenu.avatarUrl ? (
-                      <img
-                        src={userMenu.avatarUrl}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-sm font-semibold text-gray-700">
-                        {(userMenu.displayName || "U").charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </button>
-
-                  <div className="absolute right-0 top-full z-50 hidden min-w-[220px] pt-2 group-hover:block">
-                    <div className="rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-                      {userMenu.items.map((item) =>
-                        item.to ? (
-                          <Link
-                            key={`${item.to}-${item.label}`}
-                            to={item.to}
-                            className="block rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition"
-                          >
-                            {item.label}
-                          </Link>
-                        ) : (
-                          <button
-                            key={item.label}
-                            type="button"
-                            onClick={item.onClick}
-                            className="w-full text-left rounded px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-primary transition"
-                          >
-                            {item.label}
-                          </button>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {showCart && (
+                <Link
+                  to={cartTo}
+                  className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+                >
+                  GIỎ HÀNG
+                  <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
+                    {cartCount}
+                  </span>
+                </Link>
               )}
             </div>
           </div>
@@ -208,23 +169,24 @@ export default function ReusableHeader({
                   {item.label}
                 </Link>
 
-                {Array.isArray(item.dropdownItems) && item.dropdownItems.length > 0 && (
-                  <div className="absolute left-1/2 top-full z-50 hidden w-64 -translate-x-1/2 pt-2 group-hover:block">
-                    <div className="rounded-md border border-gray-200 bg-white p-2 shadow-lg">
-                      <div className="max-h-80 overflow-y-auto">
-                        {item.dropdownItems.map((subItem) => (
-                          <Link
-                            key={`${item.label}-${subItem.to}`}
-                            to={subItem.to}
-                            className="block rounded px-3 py-2 text-sm normal-case text-gray-700 hover:bg-gray-100 hover:text-primary"
-                          >
-                            {subItem.label}
-                          </Link>
-                        ))}
+                {Array.isArray(item.dropdownItems) &&
+                  item.dropdownItems.length > 0 && (
+                    <div className="absolute left-1/2 top-full z-50 hidden w-64 -translate-x-1/2 pt-2 group-hover:block">
+                      <div className="rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+                        <div className="max-h-80 overflow-y-auto">
+                          {item.dropdownItems.map((subItem) => (
+                            <Link
+                              key={`${item.label}-${subItem.to}`}
+                              to={subItem.to}
+                              className="block rounded px-3 py-2 text-sm normal-case text-gray-700 hover:bg-gray-100 hover:text-primary"
+                            >
+                              {subItem.label}
+                            </Link>
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             ))}
           </div>

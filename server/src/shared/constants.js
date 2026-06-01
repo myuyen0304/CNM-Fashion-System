@@ -68,4 +68,3 @@ module.exports = {
   PRODUCT_STATUS,
   SENDER_ROLES,
 };
-

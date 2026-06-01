@@ -68,4 +68,3 @@ const requireAnyStaffRole = requireRole(
 );
 
 module.exports = { protect, requireRole, requireAnyStaffRole };
-

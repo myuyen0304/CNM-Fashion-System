@@ -101,6 +101,32 @@ const getSimilarProducts = catchAsync(async (req, res) => {
   res.json({ success: true, data: products });
 });
 
+const getRecommendations = catchAsync(async (req, res) => {
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : 8;
+
+  const data = await productService.getRecommendations({
+    userId: req.user?._id,
+    currentProductId: req.query.currentProductId,
+    limit,
+  });
+
+  res.json({ success: true, data });
+});
+
+const getPublicRecommendations = catchAsync(async (req, res) => {
+  const rawLimit = Number(req.query.limit);
+  const limit = Number.isFinite(rawLimit) ? rawLimit : 8;
+
+  const data = await productService.getRecommendations({
+    userId: null,
+    currentProductId: req.query.currentProductId,
+    limit,
+  });
+
+  res.json({ success: true, data });
+});
+
 // Sản phẩm phổ biến (trang chủ)
 const getPopularProducts = catchAsync(async (req, res) => {
   const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
@@ -170,6 +196,8 @@ module.exports = {
   imageSearch,
   getProductDetail,
   getSimilarProducts,
+  getRecommendations,
+  getPublicRecommendations,
   getPopularProducts,
   getCategories,
   createProduct,

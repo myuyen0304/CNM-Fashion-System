@@ -61,13 +61,19 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await axiosClient.post("/auth/register", {
+      const response = await axiosClient.post("/auth/register", {
         name: formData.name.trim(),
         email: normalizedEmail,
         password: formData.password,
       });
-      alert("Đăng ký thành công!");
-      navigate("/login");
+      navigate("/verify-email", {
+        state: {
+          email: response.data?.email || normalizedEmail,
+          message:
+            response.data?.message ||
+            "OTP xác thực đã được gửi đến email của bạn.",
+        },
+      });
     } catch (err) {
       setError(err.response?.data?.message || "Lỗi đăng ký");
     } finally {

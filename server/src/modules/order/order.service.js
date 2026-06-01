@@ -4,6 +4,7 @@ const {
   SHIPPING_METHODS,
   PAYMENT_METHODS,
   RETURN_STATUS,
+  TRANSACTION_STATUS,
 } = require("../../shared/constants");
 const orderRepo = require("./order.repository");
 const cartRepo = require("../cart/cart.repository");
@@ -179,8 +180,22 @@ const updateOrderStatusByStaff = async (orderId, status) => {
   }
 
   if (status === ORDER_STATUS.CANCELLED && order.status !== ORDER_STATUS.CANCELLED) {
+    if (order.status !== ORDER_STATUS.PENDING && order.status !== ORDER_STATUS.PAID) {
+      throw new ApiError(
+        400,
+        "Chỉ có thể hủy đơn hàng đang ở trạng thái Chờ thanh toán hoặc Đã thanh toán. Với đơn đang giao/hoàn tất, vui lòng dùng quy trình đổi trả.",
+      );
+    }
+
     for (const item of order.items) {
       await productRepo.increaseStock(item.productId, item.quantity);
+    }
+
+    if (order.transaction?.status === TRANSACTION_STATUS.SUCCESS) {
+      await orderRepo.updateTransaction(orderId, {
+        status: TRANSACTION_STATUS.CANCELLED,
+        reason: "Đơn hàng bị hủy bởi nhân viên.",
+      });
     }
   }
 

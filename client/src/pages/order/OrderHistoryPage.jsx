@@ -1,32 +1,11 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import axiosClient from "../../api/axiosClient";
 import LoadingSpinner from "../../components/LoadingSpinner";
-
-const STATUS_LABELS = {
-  pending: "Chờ thanh toán",
-  paid: "Đã thanh toán",
-  completed: "Đã thanh toán",
-  shipping: "Đang giao",
-  delivered: "Hoàn tất",
-  cancelled: "Hủy",
-};
-
-const LEGACY_STATUS_TO_KEY = {
-  "Ch? thanh toán": "pending",
-  "Ðã thanh toán": "paid",
-  "Đã thanh toán": "paid",
-  "Ðang giao": "shipping",
-  "Đang giao": "shipping",
-  "Hoàn t?t": "delivered",
-  "H?y": "cancelled",
-};
-
-const normalizeStatusKey = (status) => {
-  if (!status) return "";
-  if (STATUS_LABELS[status]) return status;
-  return LEGACY_STATUS_TO_KEY[status] || status;
-};
+import {
+  getOrderDisplayStatus,
+  normalizeOrderStatus,
+} from "../../utils/orderStatus";
 
 export default function OrderHistoryPage() {
   const [orders, setOrders] = useState([]);
@@ -55,74 +34,79 @@ export default function OrderHistoryPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-8">Lịch sử đơn hàng</h1>
+      <h1 className="text-3xl font-bold mb-8">Lá»‹ch sá»­ Ä‘Æ¡n hÃ ng</h1>
 
       {orders.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-500 mb-4">Chưa có đơn hàng</p>
+          <p className="text-gray-500 mb-4">ChÆ°a cÃ³ Ä‘Æ¡n hÃ ng</p>
           <Link to="/" className="btn-primary">
-            Tiếp tục mua sắm
+            Tiáº¿p tá»¥c mua sáº¯m
           </Link>
         </div>
       ) : (
         <>
           <div className="space-y-4">
-            {orders.map((order) => {
-              const normalizedStatus = normalizeStatusKey(order.status);
-              const statusColor =
-                normalizedStatus === "delivered" ||
-                normalizedStatus === "completed"
-                  ? "text-green-600"
-                  : normalizedStatus === "cancelled"
-                    ? "text-red-600"
-                    : "text-blue-600";
+            {orders.map((order) => (
+              <div
+                key={order._id}
+                className="card p-6 hover:shadow-lg transition"
+              >
+                {(() => {
+                  const normalizedStatus = normalizeOrderStatus(order.status);
+                  const statusColorClass =
+                    normalizedStatus === "delivered" ||
+                    normalizedStatus === "completed" ||
+                    normalizedStatus === "paid"
+                      ? "text-green-600"
+                      : normalizedStatus === "cancelled"
+                        ? "text-red-600"
+                        : "text-blue-600";
 
-              return (
-                <div
-                  key={order._id}
-                  className="card p-6 hover:shadow-lg transition"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                  <div>
-                    <div className="text-sm text-gray-500">Mã đơn hàng</div>
-                    <div className="font-semibold">{order._id}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Ngày đặt</div>
-                    <div className="font-semibold">
-                      {new Date(order.createdAt).toLocaleDateString("vi-VN")}
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                      <div>
+                        <div className="text-sm text-gray-500">MÃ£ Ä‘Æ¡n hÃ ng</div>
+                        <div className="font-semibold">{order._id}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">NgÃ y Ä‘áº·t</div>
+                        <div className="font-semibold">
+                          {new Date(order.createdAt).toLocaleDateString(
+                            "vi-VN",
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Tá»•ng tiá»n</div>
+                        <div className="font-semibold text-primary">
+                          {(order.subtotal + order.shippingFee).toLocaleString(
+                            "vi-VN",
+                          )}
+                          â‚«
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-gray-500">Tráº¡ng thÃ¡i</div>
+                        <div className={`font-semibold ${statusColorClass}`}>
+                          {getOrderDisplayStatus(order.status)}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Tổng tiền</div>
-                    <div className="font-semibold text-primary">
-                      {(order.subtotal + order.shippingFee).toLocaleString(
-                        "vi-VN",
-                      )}
-                      ₫
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-500">Trạng thái</div>
-                    <div className={`font-semibold ${statusColor}`}>
-                      {STATUS_LABELS[normalizedStatus] || normalizedStatus || "N/A"}
-                    </div>
-                  </div>
-                  </div>
+                  );
+                })()}
 
                   <div className="text-sm text-gray-600 mb-4">
-                    {order.items.length} sản phẩm
+                    {order.items.length} sáº£n pháº©m
                   </div>
 
                   <Link
                     to={`/order-detail/${order._id}`}
                     className="text-primary hover:underline font-semibold"
                   >
-                    Xem chi tiết →
+                    Xem chi tiáº¿t â†’
                   </Link>
                 </div>
-              );
-            })}
+              ))}
           </div>
 
           {/* Pagination */}
@@ -133,7 +117,7 @@ export default function OrderHistoryPage() {
                 disabled={page === 1}
                 className="px-4 py-2 border border-primary text-primary rounded disabled:opacity-50"
               >
-                Trước
+                TrÆ°á»›c
               </button>
               <span className="px-4 py-2">
                 {page} / {totalPages}

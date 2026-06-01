@@ -7,7 +7,7 @@ const productRoutes = require("./modules/product/product.routes");
 const cartRoutes = require("./modules/cart/cart.routes");
 const orderRoutes = require("./modules/order/order.routes");
 const paymentRoutes = require("./modules/payment/payment.routes");
-const reviewRoutes = require("./modules/review/review.routes");
+const reviewRoutes = require("./review/review.routes");
 const chatRoutes = require("./modules/chat/chat.routes");
 
 /**
@@ -18,7 +18,7 @@ const setupRoutes = (app) => {
   // === Public routes (no auth required) ===
   app.use("/api/auth", authRoutes);
   app.use("/api/products", productRoutes);
-  app.use("/api/payments", paymentRoutes); // Callback VNPay không cần auth
+  app.use("/api/payments", paymentRoutes); // Initiate cần auth (tự handle trong route), callback VNPay public
 
   // === Protected routes (require authentication) ===
   app.use("/api/users", protect, userRoutes);

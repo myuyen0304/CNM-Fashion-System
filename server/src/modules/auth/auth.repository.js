@@ -1,4 +1,4 @@
-const { User, RefreshToken } = require("./auth.model");
+const { User, RefreshToken, OtpToken } = require("./auth.model");
 
 // ========================
 // USER queries
@@ -17,8 +17,16 @@ const createUser = async (userData) => {
   return user.save();
 };
 
+const updateUser = async (userId, updates) => {
+  return User.findByIdAndUpdate(userId, updates, { new: true });
+};
+
 const updatePassword = async (userId, hashedPassword) => {
-  return User.findByIdAndUpdate(userId, { password: hashedPassword });
+  return User.findByIdAndUpdate(
+    userId,
+    { password: hashedPassword },
+    { new: true },
+  );
 };
 
 // ========================
@@ -41,13 +49,72 @@ const deleteAllRefreshTokens = async (userId) => {
   return RefreshToken.deleteMany({ userId });
 };
 
+// ========================
+// OTP TOKEN queries
+// ========================
+
+const findOtpToken = async (email, purpose) => {
+  return OtpToken.findOne({ email: email.toLowerCase(), purpose });
+};
+
+const upsertOtpToken = async ({
+  userId,
+  email,
+  purpose,
+  otpHash,
+  expiresAt,
+  resendCount,
+  lastSentAt,
+}) => {
+  return OtpToken.findOneAndUpdate(
+    { email: email.toLowerCase(), purpose },
+    {
+      userId,
+      email: email.toLowerCase(),
+      purpose,
+      otpHash,
+      expiresAt,
+      attempts: 0,
+      resendCount,
+      lastSentAt,
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    },
+  );
+};
+
+const incrementOtpAttempts = async (otpTokenId) => {
+  return OtpToken.findByIdAndUpdate(
+    otpTokenId,
+    { $inc: { attempts: 1 } },
+    { new: true },
+  );
+};
+
+const deleteOtpToken = async (email, purpose) => {
+  return OtpToken.deleteOne({ email: email.toLowerCase(), purpose });
+};
+
+const deleteOtpTokensByUser = async (userId, purpose) => {
+  return OtpToken.deleteMany({ userId, purpose });
+};
+
 module.exports = {
   findUserByEmail,
   findUserById,
   createUser,
+  updateUser,
   updatePassword,
   saveRefreshToken,
   findRefreshToken,
   deleteRefreshToken,
   deleteAllRefreshTokens,
+  findOtpToken,
+  upsertOtpToken,
+  incrementOtpAttempts,
+  deleteOtpToken,
+  deleteOtpTokensByUser,
 };

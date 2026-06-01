@@ -3,26 +3,14 @@ const fs = require("fs");
 const path = require("path");
 const ApiError = require("../../shared/utils/ApiError");
 const { ROLES } = require("../../shared/constants");
-const { uploadToCloudinary } = require("../../config/cloudinary");
+const {
+  isCloudinaryConfigured,
+  uploadToCloudinary,
+} = require("../../config/cloudinary");
 const userRepo = require("./user.repository");
 
 const AVATAR_PUBLIC_PATH = "/uploads/avatars/";
 const AVATARS_DIR = path.join(__dirname, "../../../uploads/avatars");
-
-const isCloudinaryConfigured = () => {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "";
-  const apiKey = process.env.CLOUDINARY_API_KEY || "";
-  const apiSecret = process.env.CLOUDINARY_API_SECRET || "";
-
-  return (
-    cloudName &&
-    apiKey &&
-    apiSecret &&
-    !cloudName.startsWith("your_") &&
-    !apiKey.startsWith("your_") &&
-    !apiSecret.startsWith("your_")
-  );
-};
 
 const saveAvatarToLocal = async (file, userId) => {
   await fs.promises.mkdir(AVATARS_DIR, { recursive: true });
@@ -102,7 +90,8 @@ const updateAvatar = async (userId, file) => {
     try {
       avatarUrl = await uploadToCloudinary(file.buffer, "ecommerce/avatars");
     } catch (error) {
-      avatarUrl = await saveAvatarToLocal(file, userId);
+      console.error("Cloudinary avatar upload failed:", error.message);
+      throw new ApiError(500, "Upload ảnh lên Cloudinary thất bại.");
     }
   } else {
     avatarUrl = await saveAvatarToLocal(file, userId);
@@ -148,7 +137,10 @@ const setUserRole = async (actorUser, targetUserId, role) => {
     throw new ApiError(400, "Role không hợp lệ.");
   }
 
-  if (targetUserId.toString() === actorUser._id.toString() && role !== ROLES.ADMIN) {
+  if (
+    targetUserId.toString() === actorUser._id.toString() &&
+    role !== ROLES.ADMIN
+  ) {
     throw new ApiError(400, "Admin không thể tự hạ quyền của chính mình.");
   }
 
@@ -158,8 +150,14 @@ const setUserRole = async (actorUser, targetUserId, role) => {
 };
 
 const setUserActiveStatus = async (actorUser, targetUserId, isActive) => {
-  if (targetUserId.toString() === actorUser._id.toString() && isActive === false) {
-    throw new ApiError(400, "Admin không thể tự khóa tài khoản của chính mình.");
+  if (
+    targetUserId.toString() === actorUser._id.toString() &&
+    isActive === false
+  ) {
+    throw new ApiError(
+      400,
+      "Admin không thể tự khóa tài khoản của chính mình.",
+    );
   }
 
   const user = await userRepo.updateUserActiveStatus(targetUserId, isActive);
@@ -176,4 +174,3 @@ module.exports = {
   setUserRole,
   setUserActiveStatus,
 };
-
