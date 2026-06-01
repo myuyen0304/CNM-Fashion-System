@@ -5,6 +5,7 @@ import axiosClient from "../../api/axiosClient";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   buildChatRequestConfig,
+  clearGuestChatSessionToken,
   syncGuestChatSession,
   extractChatMessages,
 } from "../../utils/chatSession";
@@ -150,6 +151,7 @@ export default function ChatPage() {
   const [streamingContent, setStreamingContent] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [chatReloadKey, setChatReloadKey] = useState(0);
 
   const messagesEndRef = useRef(null);
 
@@ -207,7 +209,7 @@ export default function ChatPage() {
     return () => {
       ignore = true;
     };
-  }, [routeRoomId, token]);
+  }, [routeRoomId, token, chatReloadKey]);
 
   useEffect(() => {
     if (!roomId) return undefined;
@@ -353,6 +355,28 @@ export default function ChatPage() {
     }
   };
 
+  const startNewChat = () => {
+    if (!token) {
+      clearGuestChatSessionToken();
+    }
+
+    setRoomId(null);
+    setMessages([]);
+    setInput("");
+    setRoomStatus("active");
+    setAwaitingResolutionConfirm(false);
+    setStreamingContent(null);
+    setIsTyping(false);
+    setShowLoginPrompt(false);
+    setLoading(true);
+
+    if (routeRoomId) {
+      navigate("/chat", { replace: true });
+    } else {
+      setChatReloadKey((value) => value + 1);
+    }
+  };
+
   const goToLogin = () => {
     navigate("/login", {
       state: {
@@ -455,6 +479,25 @@ export default function ChatPage() {
         !awaitingResolutionConfirm &&
         !isTyping &&
         streamingContent === null &&
+        messages.length > 1 && (
+          <div className="px-4 py-3 bg-white border-t flex flex-wrap items-center gap-2">
+            <p className="text-sm text-gray-600 flex-1 min-w-[180px]">
+              Vấn đề của bạn đã được hỗ trợ xong?
+            </p>
+            <button
+              onClick={() => handleResolutionConfirm(true)}
+              disabled={sending}
+              className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-50"
+            >
+              Kết thúc phiên
+            </button>
+          </div>
+        )}
+
+      {!isClosed &&
+        !awaitingResolutionConfirm &&
+        !isTyping &&
+        streamingContent === null &&
         messages.length <= 2 && (
           <div className="px-4 py-2.5 border-t bg-white flex flex-wrap gap-2">
             {[
@@ -474,6 +517,18 @@ export default function ChatPage() {
             ))}
           </div>
         )}
+
+      {isClosed && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+          <button
+            onClick={startNewChat}
+            disabled={sending}
+            className="w-full btn-primary text-sm py-2 disabled:opacity-50"
+          >
+            Tạo phiên chat mới
+          </button>
+        </div>
+      )}
 
       <div className="px-4 py-3 border-t bg-white flex gap-2 items-end">
         <input

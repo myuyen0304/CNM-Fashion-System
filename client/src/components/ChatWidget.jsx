@@ -433,6 +433,19 @@ export default function ChatWidget() {
             </div>
           )}
 
+          {!isClosed && !awaitingConfirm && !isTyping && !isStreaming && messages.length > 1 && (
+            <div className="px-3 py-2 bg-white border-t flex items-center gap-2">
+              <p className="text-[11px] text-gray-500 flex-1">Vấn đề đã được hỗ trợ xong?</p>
+              <button
+                onClick={() => handleConfirm(true)}
+                disabled={sending}
+                className="btn-secondary text-xs py-1.5 px-2 disabled:opacity-50"
+              >
+                Kết thúc phiên
+              </button>
+            </div>
+          )}
+
           {!isClosed && !awaitingConfirm && !isTyping && !isStreaming && messages.length <= 2 && (
             <div className="px-3 py-2 border-t bg-white flex flex-wrap gap-1.5">
               {[
