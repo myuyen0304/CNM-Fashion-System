@@ -114,8 +114,15 @@ export default function Navbar() {
     return (
       <nav className="bg-primary text-white sticky top-0 z-50 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <Link to="/staff" className="text-2xl font-bold whitespace-nowrap">
-            Bảng Điều Khiển Quản Trị
+          <Link
+            to="/staff"
+            className="block shrink-0 rounded-md bg-white px-2 py-1"
+          >
+            <img
+              src={logoImage}
+              alt="PU Studio"
+              className="h-10 w-28 object-cover object-center md:h-12 md:w-36"
+            />
           </Link>
           <div className="flex items-center gap-3 flex-wrap justify-end">
             <button
