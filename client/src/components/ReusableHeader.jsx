@@ -23,12 +23,34 @@ export default function ReusableHeader({
   const cartLink = (
     <Link
       to={cartTo}
-      className="relative text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+      className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
     >
-      GIỎ HÀNG
-      <span className="absolute -top-2 -right-3 w-5 h-5 rounded-full bg-black text-white text-[10px] grid place-items-center">
-        {cartCount}
+      <span className="relative grid h-8 w-8 place-items-center rounded-full border border-gray-300 bg-white">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="h-4 w-4"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M6.5 8.5h11l-1 10h-9l-1-10z"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M9 8.5a3 3 0 016 0"
+          />
+        </svg>
+        <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-black px-1 text-[10px] leading-none text-white">
+          {cartCount}
+        </span>
       </span>
+      <span>GIỎ HÀNG</span>
     </Link>
   );
 
@@ -36,20 +58,22 @@ export default function ReusableHeader({
     <div className="relative group">
       <button
         type="button"
-        className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide hover:text-primary transition"
+        className="flex min-w-0 items-center gap-2 rounded-md px-1 py-1 text-sm font-semibold text-gray-900 hover:text-primary transition"
       >
         {userMenu.avatarUrl ? (
           <img
             src={userMenu.avatarUrl}
             alt={userMenu.displayName || "User"}
-            className="h-8 w-8 rounded-full object-cover border border-gray-200"
+            className="h-9 w-9 shrink-0 rounded-full object-cover border border-gray-200"
           />
         ) : (
-          <span className="h-8 w-8 rounded-full bg-gray-900 text-white grid place-items-center text-sm">
+          <span className="h-9 w-9 shrink-0 rounded-full bg-gray-900 text-white grid place-items-center text-sm">
             {userInitial || "U"}
           </span>
         )}
-        <span className="max-w-32 truncate">{userMenu.displayName}</span>
+        <span className="max-w-[120px] truncate" title={userMenu.displayName}>
+          {userMenu.displayName}
+        </span>
       </button>
 
       <div className="absolute right-0 top-full z-50 hidden w-56 pt-2 group-hover:block">
@@ -167,7 +191,7 @@ export default function ReusableHeader({
               </div>
             </div>
 
-            <div className="hidden md:flex items-center gap-5">
+            <div className="hidden md:flex items-center gap-6">
               {showCart && cartFirst && cartLink}
               {rightLinks.map((item) =>
                 item.to ? (
