@@ -1,7 +1,23 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import axiosClient from "../api/axiosClient";
 
-const AuthContext = createContext();
+const createUnavailableAction = (actionName) => {
+  return async () => {
+    throw new Error(`${actionName} is unavailable because AuthProvider is missing.`);
+  };
+};
+
+const defaultAuthContextValue = {
+  user: null,
+  token: null,
+  loading: false,
+  login: createUnavailableAction("login"),
+  register: createUnavailableAction("register"),
+  logout: createUnavailableAction("logout"),
+  syncUser: () => {},
+};
+
+const AuthContext = createContext(defaultAuthContextValue);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -10,7 +26,6 @@ export const AuthProvider = ({ children }) => {
 
   const clearAuthState = () => {
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);
@@ -74,10 +89,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const response = await axiosClient.post("/auth/login", { email, password });
-    const { accessToken, refreshToken, user } = response.data;
+    const { accessToken, user } = response.data;
 
     localStorage.setItem("accessToken", accessToken);
-    localStorage.setItem("refreshToken", refreshToken);
 
     setToken(accessToken);
     syncUser(user);
@@ -90,15 +104,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem("refreshToken");
     try {
-      await axiosClient.post("/auth/logout", { refreshToken });
+      await axiosClient.post("/auth/logout");
     } catch (err) {
       console.error("Logout error:", err);
     }
 
     localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
 
     clearAuthState();
@@ -114,9 +126,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within AuthProvider");
-  }
-  return context;
+  return useContext(AuthContext);
 };

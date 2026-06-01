@@ -1,4 +1,4 @@
-﻿import {
+import {
   BrowserRouter as Router,
   Routes,
   Route,
@@ -10,33 +10,24 @@ import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import CustomerFacingRoute from "./components/CustomerFacingRoute";
 import ScrollToTop from "./components/ScrollToTop";
-
-// Auth pages
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/auth/ResetPasswordPage";
 import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
-
-// Product pages
 import HomePage from "./pages/product/HomePage";
 import ShopPage from "./pages/product/ShopPage";
-import CollectionPage from "./pages/product/CollectionPage";
 import FashionNewsPage from "./pages/product/FashionNewsPage";
 import SearchPage from "./pages/product/SearchPage";
 import ProductDetailPage from "./pages/product/ProductDetailPage";
 import AboutUsPage from "./pages/help/AboutUsPage";
 import CareersPage from "./pages/help/CareersPage";
 import PolicyPage from "./pages/help/PolicyPage";
-
-// Cart & Order pages
 import CartPage from "./pages/cart/CartPage";
 import CheckoutPage from "./pages/order/CheckoutPage";
 import OrderHistoryPage from "./pages/order/OrderHistoryPage";
 import OrderDetailPage from "./pages/order/OrderDetailPage";
 import PaymentResultPage from "./pages/payment/PaymentResultPage";
-
-// User pages
 import ProfilePage from "./pages/profile/ProfilePage";
 import ChatPage from "./pages/chat/ChatPage";
 import StaffDashboardPage from "./pages/staff/StaffDashboardPage";
@@ -53,7 +44,6 @@ function App() {
         <CartProvider>
           <Layout>
             <Routes>
-              {/* Public routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -68,21 +58,23 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/home" element={<HomePage />} />
                 <Route path="/Home" element={<HomePage />} />
-
                 <Route path="/shop" element={<ShopPage />} />
                 <Route path="/danh-muc" element={<ShopPage />} />
                 <Route path="/Danh-muc" element={<ShopPage />} />
-
-                <Route path="/bo-suu-tap" element={<CollectionPage />} />
-                <Route path="/Bo-suu-tap" element={<CollectionPage />} />
-
+                <Route
+                  path="/bo-suu-tap"
+                  element={<Navigate to="/shop" replace />}
+                />
+                <Route
+                  path="/Bo-suu-tap"
+                  element={<Navigate to="/shop" replace />}
+                />
                 <Route
                   path="/tin-tuc-thoi-trang"
                   element={<FashionNewsPage />}
                 />
                 <Route path="/tin-tuc" element={<FashionNewsPage />} />
                 <Route path="/Tin-tuc" element={<FashionNewsPage />} />
-
                 <Route
                   path="/khuyen-mai"
                   element={<Navigate to="/search?q=khuyến%20mãi" replace />}
@@ -91,7 +83,6 @@ function App() {
                   path="/Khuyen-mai"
                   element={<Navigate to="/khuyen-mai" replace />}
                 />
-
                 <Route path="/tro-giup" element={<AboutUsPage />} />
                 <Route path="/Tro-giup" element={<AboutUsPage />} />
                 <Route path="/ve-chung-toi" element={<AboutUsPage />} />
@@ -101,13 +92,13 @@ function App() {
                 />
                 <Route path="/tuyen-dung-viec-lam" element={<CareersPage />} />
                 <Route path="/chinh-sach" element={<PolicyPage />} />
-
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/products/:id" element={<ProductDetailPage />} />
                 <Route path="/payment/result" element={<PaymentResultPage />} />
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/chat/:id" element={<ChatPage />} />
               </Route>
 
-              {/* Protected routes */}
               <Route element={<CustomerFacingRoute />}>
                 <Route element={<ProtectedRoute />}>
                   <Route path="/cart" element={<CartPage />} />
@@ -118,12 +109,9 @@ function App() {
                     element={<OrderDetailPage />}
                   />
                   <Route path="/profile" element={<ProfilePage />} />
-                  <Route path="/chat" element={<ChatPage />} />
-                  <Route path="/chat/:id" element={<ChatPage />} />
                 </Route>
               </Route>
 
-              {/* Staff routes */}
               <Route
                 element={
                   <ProtectedRoute
@@ -139,7 +127,6 @@ function App() {
                 <Route path="/staff/support" element={<SupportChatPage />} />
               </Route>
 
-              {/* Supervisor + Admin routes */}
               <Route
                 element={
                   <ProtectedRoute allowedRoles={["admin", "supervisor"]} />
@@ -151,7 +138,6 @@ function App() {
                 />
               </Route>
 
-              {/* Admin only routes */}
               <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
                 <Route path="/admin/users" element={<UsersManagementPage />} />
               </Route>

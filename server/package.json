@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "test": "node --test",
+    "test:watch": "node --watch --test",
     "import:csv": "node import-csv.js",
-    "create:user": "node scripts/create-staff-user.js"
+    "create:user": "node scripts/create-staff-user.js",
+    "fix:chat-indexes": "node scripts/fix-chat-indexes.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -23,6 +26,7 @@
     "mongoose": "^8.0.3",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.7",
+    "openai": "^6.37.0",
     "socket.io": "^4.7.2",
     "vnpay": "^2.4.4"
   },

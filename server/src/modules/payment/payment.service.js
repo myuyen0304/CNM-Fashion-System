@@ -8,6 +8,8 @@ const {
 const orderRepo = require("../order/order.repository");
 const cartRepo = require("../cart/cart.repository");
 
+const VNPAY_DEFAULT_TIMEZONE = process.env.VNPAY_TIMEZONE || "Asia/Ho_Chi_Minh";
+
 const getVNPayConfig = () => {
   const config = {
     vnpUrl: process.env.VNPAY_URL || process.env.VNPAY_API_URL,
@@ -67,6 +69,28 @@ const restoreUUID = (stripped) => {
   ].join("-");
 };
 
+const formatVNPayDate = (date, timeZone = VNPAY_DEFAULT_TIMEZONE) => {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+
+  const parts = formatter.formatToParts(date).reduce((acc, part) => {
+    if (part.type !== "literal") {
+      acc[part.type] = part.value;
+    }
+    return acc;
+  }, {});
+
+  return `${parts.year}${parts.month}${parts.day}${parts.hour}${parts.minute}${parts.second}`;
+};
+
 /**
  * Tạo URL thanh toán VNPay
  */
@@ -74,22 +98,9 @@ const createVNPayURL = (orderId, amount, orderInfo, clientIp) => {
   const { vnpUrl, tmnCode, secretKey, returnUrl } = getVNPayConfig();
 
   const date = new Date();
-  const createDate =
-    date.getFullYear() +
-    ("0" + (date.getMonth() + 1)).slice(-2) +
-    ("0" + date.getDate()).slice(-2) +
-    ("0" + date.getHours()).slice(-2) +
-    ("0" + date.getMinutes()).slice(-2) +
-    ("0" + date.getSeconds()).slice(-2);
-
   const expireDate = new Date(date.getTime() + 15 * 60000);
-  const expireString =
-    expireDate.getFullYear() +
-    ("0" + (expireDate.getMonth() + 1)).slice(-2) +
-    ("0" + expireDate.getDate()).slice(-2) +
-    ("0" + expireDate.getHours()).slice(-2) +
-    ("0" + expireDate.getMinutes()).slice(-2) +
-    ("0" + expireDate.getSeconds()).slice(-2);
+  const createDate = formatVNPayDate(date);
+  const expireString = formatVNPayDate(expireDate);
 
   // FIX #1: Strip dấu gạch ngang khỏi UUID
   // VNPay chỉ chấp nhận [a-zA-Z0-9] cho vnp_TxnRef
@@ -183,6 +194,20 @@ const handleVNPayCallback = async (vnpParams) => {
   const order = await orderRepo.findOrderById(orderId);
   if (!order) {
     throw new ApiError(404, "Không tìm thấy đơn hàng.");
+  }
+
+  // Idempotency: nếu order đã ở trạng thái cuối, bỏ qua callback trùng lặp
+  // tránh transaction bị overwrite khi VNPay retry với response code khác
+  const terminalStatuses = [
+    ORDER_STATUS.PAID,
+    ORDER_STATUS.COMPLETED,
+    ORDER_STATUS.CANCELLED,
+  ];
+  if (terminalStatuses.includes(order.status)) {
+    return {
+      success: true,
+      status: order.transaction?.status || TRANSACTION_STATUS.SUCCESS,
+    };
   }
 
   let transactionStatus = TRANSACTION_STATUS.FAILED;

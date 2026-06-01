@@ -6,6 +6,19 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const OTP_REGEX = /^\d{6}$/;
 const RESEND_COOLDOWN_SECONDS = 60;
+const RESEND_TIMEOUT_MS = 45000;
+
+const getResendErrorMessage = (err) => {
+  if (err.code === "ECONNABORTED") {
+    return "Máy chủ đang khởi động hoặc email gửi quá lâu. Vui lòng thử lại sau.";
+  }
+
+  if (!err.response) {
+    return "Không kết nối được đến máy chủ. Vui lòng kiểm tra mạng hoặc URL API.";
+  }
+
+  return err.response?.data?.message || "Không thể gửi lại OTP";
+};
 
 export default function VerifyEmailPage() {
   const { token } = useParams();
@@ -106,15 +119,21 @@ export default function VerifyEmailPage() {
     setLoading(true);
 
     try {
-      const response = await axiosClient.post("/auth/resend-registration-otp", {
-        email: normalizedEmail,
-      });
+      const response = await axiosClient.post(
+        "/auth/resend-registration-otp",
+        {
+          email: normalizedEmail,
+        },
+        {
+          timeout: RESEND_TIMEOUT_MS,
+        },
+      );
       setSuccess(
         response.data?.message || "OTP mới đã được gửi đến email của bạn.",
       );
       setResendCountdown(RESEND_COOLDOWN_SECONDS);
     } catch (err) {
-      setError(err.response?.data?.message || "Không thể gửi lại OTP");
+      setError(getResendErrorMessage(err));
     } finally {
       setLoading(false);
     }

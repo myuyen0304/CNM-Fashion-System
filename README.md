@@ -1,439 +1,276 @@
-# E-Shop - Modular Monolith E-Commerce Platform
+# CNM Fashion System
 
-## Project Overview
+CNM Fashion System is a modular monolith e-commerce application with a React frontend and an Express/MongoDB backend. This repository covers the main storefront flows, account management, cart, ordering, VNPay payment, product reviews, staff administration screens, and real-time customer support chat.
 
-A complete **Modular Monolith** e-commerce application built with:
+## Tech Stack
 
-- **Backend**: Node.js + Express.js + MongoDB
-- **Frontend**: React 18 + TailwindCSS
-- **Real-time**: Socket.io for Chat
-- **Payment**: VNPay Integration
+- Frontend: React 18, Vite, React Router, TailwindCSS, Axios, Socket.IO Client
+- Backend: Node.js, Express, MongoDB, Mongoose, Socket.IO
+- External integrations: Cloudinary, Nodemailer, VNPay, OpenAI SDK, Anthropic SDK, Google Generative AI SDK
+- Testing: Node test runner for the backend, Vitest for the frontend
 
-This implementation follows clean architecture principles with 8 independent domain modules.
+## Repository Structure
 
-## Architecture
-
-### Modular Monolith Structure
-
-```
-server/
-├── src/
-│ ├── modules/
-│ │ ├── auth/ # Authentication & User Accounts
-│ │ ├── user/ # User Profiles & Settings
-│ │ ├── product/ # Product Catalog & Search
-│ │ ├── cart/ # Shopping Cart
-│ │ ├── order/ # Order Management
-│ │ ├── payment/ # Payment Gateway Integration
-│ │ ├── review/ # Product Reviews & Ratings
-│ │ └── chat/ # Real-time Chat Support
-│ ├── shared/ # Shared utilities, middleware, configs
-│ ├── routes.js # Central route aggregator
-│ └── server.js # App entry point
-
+```text
 client/
-├── src/
-│ ├── pages/
-│ │ ├── auth/ # Login, Register, Password Reset
-│ │ ├── product/ # Home, Search, Product Detail
-│ │ ├── cart/ # Shopping Cart
-│ │ ├── order/ # Checkout, Order History, Detail
-│ │ ├── profile/ # User Profile & Settings
-│ │ ├── chat/ # Chat Interface
-│ │ └── payment/ # Payment Result
-│ ├── components/ # Reusable UI Components
-│ ├── contexts/ # Global State (Auth, Cart)
-│ ├── api/ # Axios Client with Interceptors
-│ └── App.jsx # Routing Setup
+  src/
+    api/          Axios client and interceptors
+    components/   Shared UI and route guards
+    contexts/     Shared auth and cart state
+    pages/        Route screens
+    utils/        Frontend helpers
+
+server/
+  src/
+    config/       Database, Cloudinary, Socket.IO
+    modules/      auth, user, product, cart, order, payment, chat
+    review/       Product review module
+    shared/       Middleware, constants, utilities
+    app.js        Express app configuration
+    routes.js     Central route registration
+    server.js     Process entry point
+
+docker/
+postman/
+docs/
 ```
 
-## Quick Start
+## Main Features
 
-### Prerequisites
+- Registration, login, refresh tokens, email verification, and password reset
+- Product browsing, search, filtering, recommendations, and detail pages
+- Cart and checkout
+- Order history, order details, order cancellation, and staff order management
+- VNPay payment initialization and callback handling
+- Product reviews and rating aggregation
+- Customer support chat with guest sessions, login requirements for sensitive data, and staff takeover
+- Staff screens for dashboard, products, orders, users, and support chat
 
-- Node.js 14+ and npm/yarn
-- MongoDB running locally or Atlas connection
-- Git
+## Application Architecture
 
-### Backend Setup
+The backend follows a layered flow:
 
-1. **Navigate to server directory**
-
- ```bash
- cd server
- npm install
- ```
-
-2. **Create .env file** (copy from .env.example)
-
- ```bash
- cp .env.example .env
- ```
-
-3. **Configure .env** with your credentials:
-
- ```
- MONGO_URI=mongodb://localhost:27017/eshop
- JWT_SECRET=your_secret_key
- CLOUDINARY_NAME=your_cloudinary_name
- CLOUDINARY_API_KEY=your_api_key
- CLOUDINARY_API_SECRET=your_api_secret
- VNPAY_MERCHANT_ID=your_merchant_id
- VNPAY_HASH_SECRET=your_hash_secret
- EMAIL_USER=your_email@gmail.com
- EMAIL_PASSWORD=your_app_password
- PORT=5000
- ```
-
-4. **Start the server**
- ```bash
- npm start
- ```
- Server runs at `http://localhost:5000`
-
-### Frontend Setup
-
-1. **Navigate to client directory**
-
- ```bash
- cd client
- npm install
- ```
-
-2. **Create .env file**
-
- ```
- VITE_API_URL=http://localhost:5000
- ```
-
-3. **Start development server**
- ```bash
- npm run dev
- ```
- Frontend runs at `http://localhost:5173`
-
-## API Endpoints Summary
-
-### Authentication (Public)
-
-```
-POST /api/auth/register Register new account
-POST /api/auth/verify Verify email
-POST /api/auth/login Login
-POST /api/auth/refresh-token Refresh access token
-POST /api/auth/logout Logout
-POST /api/auth/forgot-password Request password reset
-POST /api/auth/reset-password Reset password
+```text
+routes -> controller -> service -> repository -> Mongoose model
 ```
 
-### Products (Public)
+The frontend is organized by route pages in `client/src/pages`, shared UI in `client/src/components`, and application-level state through `AuthContext` and `CartContext`.
 
-```
-GET /api/products/popular Get popular products
-GET /api/products/search?q=... Search by keyword
-GET /api/products/filter Filter by criteria
-GET /api/products/:id Get product detail
-GET /api/products/:id/similar Get similar products
-```
+Main entry points:
 
-### User (Protected)
+- Frontend: `client/src/main.jsx`, `client/src/App.jsx`
+- Backend: `server/src/server.js`, `server/src/app.js`, `server/src/routes.js`
 
-```
-GET /api/users/profile Get user profile
-PATCH /api/users/profile Update profile
-PATCH /api/users/profile/avatar Upload avatar
-PATCH /api/users/password Change password
-```
+## Environment Requirements
 
-### Cart (Protected)
+- Node.js 18 or later
+- npm
+- Local MongoDB or MongoDB Atlas
+- Cloudinary, SMTP, VNPay, and AI provider accounts if the corresponding integrations are needed
+- Docker Desktop if you want to run the project with Docker Compose
 
-```
-GET /api/cart Get cart
-POST /api/cart/items Add item
-PATCH /api/cart/items/:productId Update item quantity
-DELETE /api/cart/items/:productId Remove item
-DELETE /api/cart Clear cart
-```
-
-### Orders (Protected)
-
-```
-POST /api/orders Create order
-GET /api/orders Get order history
-GET /api/orders/:id Get order detail
-PATCH /api/orders/:id/cancel Cancel order
-```
-
-### Payment (Public)
-
-```
-POST /api/payments/initiate Initiate VNPay payment
-GET /api/payments/callback VNPay callback
-```
-
-### Reviews (Protected)
-
-```
-POST /api/reviews Create review
-GET /api/reviews/product/:id Get product reviews
-```
-
-### Chat (Protected + Socket.io)
-
-```
-POST /api/chat/room/:id Get messages
-POST /api/chat/room/:id/message Send message
-Socket events:
- - joinRoom(roomId)
- - sendMessage(message)
- - newMessage (listen)
- - adminAssigned (listen)
-```
-
-## Key Features
-
-### Backend Features
-
-- JWT-based authentication with refresh tokens
-- Email verification & password reset flow
-- Product search (regex + text index + AI similarity)
-- Shopping cart with stock validation
-- Order management with status tracking
-- VNPay payment gateway integration
-- Product review system with rating aggregation
-- Real-time chat with Socket.io
-- Avatar upload to Cloudinary
-- Comprehensive error handling
-
-### Frontend Features
-
-- Responsive design with TailwindCSS
-- Protected routes with ProtectedRoute component
-- Global auth/cart state with Context API
-- Axios interceptors for JWT auto-refresh
-- Form validation on all inputs
-- Search, filter, and product discovery
-- Multi-step checkout process
-- Order history and review interface
-- User profile management
-- Real-time chat UI ready for Socket.io
-
-## Frontend File Structure
-
-```
-client/src/
-├── pages/
-│ ├── auth/
-│ │ ├── LoginPage.jsx
-│ │ ├── RegisterPage.jsx
-│ │ ├── VerifyEmailPage.jsx
-│ │ ├── ForgotPasswordPage.jsx
-│ │ └── ResetPasswordPage.jsx
-│ ├── product/
-│ │ ├── HomePage.jsx
-│ │ ├── SearchPage.jsx
-│ │ └── ProductDetailPage.jsx
-│ ├── cart/
-│ │ └── CartPage.jsx
-│ ├── order/
-│ │ ├── CheckoutPage.jsx
-│ │ ├── OrderHistoryPage.jsx
-│ │ └── OrderDetailPage.jsx
-│ ├── profile/
-│ │ └── ProfilePage.jsx
-│ ├── chat/
-│ │ └── ChatPage.jsx
-│ └── payment/
-│ └── PaymentResultPage.jsx
-├── components/
-│ ├── Navbar.jsx
-│ ├── Footer.jsx
-│ ├── Layout.jsx
-│ ├── ProtectedRoute.jsx
-│ ├── LoadingSpinner.jsx
-│ ├── StarRating.jsx
-│ └── ProductCard.jsx
-├── contexts/
-│ ├── AuthContext.jsx
-│ └── CartContext.jsx
-├── api/
-│ └── axiosClient.js
-├── App.jsx
-└── main.jsx
-```
-
-## Technology Stack
+## Environment Configuration
 
 ### Backend
 
-- Express.js - Web framework
-- MongoDB + Mongoose - Database
-- JWT - Authentication
-- bcryptjs - Password hashing
-- Nodemailer - Email service
-- Multer - File upload
-- Cloudinary - Image storage
-- Socket.io - Real-time communication
-- crypto - HMAC signature verification
+Create `server/.env` from `server/.env.example`.
+
+Required variables:
+
+```env
+MONGO_URI=
+JWT_SECRET=
+JWT_REFRESH_SECRET=
+CLIENT_URL=http://localhost:5173
+PORT=5000
+```
+
+Variables for optional integrations:
+
+```env
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+DEEPSEEK_API_KEY=
+EMAIL_HOST=
+EMAIL_PORT=
+EMAIL_USER=
+EMAIL_PASSWORD=
+EMAIL_FROM=
+VNPAY_TMN_CODE=
+VNPAY_HASH_SECRET=
+VNPAY_URL=
+VNPAY_RETURN_URL=
+```
 
 ### Frontend
 
-- React 18 - UI library
-- React Router v6 - Client-side routing
-- Axios - HTTP client
-- TailwindCSS - Utility-first CSS
-- Vite - Build tool
-- Context API - State management
-- Socket.io Client - Real-time communication
+Create `client/.env` from `client/.env.example`.
 
-## Security Features
-
-1. **Authentication**
- - JWT with access + refresh tokens
- - Bcrypt password hashing (10 salt rounds)
- - Token refresh on 401 response
-
-2. **Authorization**
- - Role-based access control (middleware)
- - Protected routes on frontend
- - Protected endpoints on backend
-
-3. **Data Validation**
- - Input validation on all endpoints
- - Mongoose schema validation
- - Frontend form validation
-
-4. **Payment Security**
- - HMAC-SHA512 signature verification for VNPay
- - Callback validation
-
-5. **File Upload**
- - File type validation (JPEG, PNG, WebP)
- - Size limit (5MB)
- - Cloudinary storage (not local)
-
-## Common Development Tasks
-
-### Add a New Product
-
-```bash
-# Use MongoDB CLI or compass to insert:
-db.products.insertOne({
- name: "Sample Product",
- price: 100000,
- description: "...",
- category: "Electronics",
- images: ["https://..."],
- stock: 10
-})
+```env
+VITE_API_URL=http://localhost:5000/api
 ```
 
-### Run Database Seed (if seed script exists)
+## Local Development
+
+Install dependencies:
+
+```bash
+npm install
+npm --prefix server install
+npm --prefix client install
+```
+
+Start the backend:
 
 ```bash
 cd server
-npm run seed
+npm run dev
 ```
 
-### Test JWT Flow
-
-1. Register at `/register`
-2. Verify email via link
-3. Login at `/login`
-4. Token auto-stored in localStorage
-5. Refresh happens automatically on 401
-
-### E2E Flow Test
-
-1. Browse products (HomePage)
-2. Search products (SearchPage)
-3. View product detail
-4. Add to cart
-5. Proceed to checkout
-6. Make payment
-7. View order history
-8. Leave review
-
-## Debugging
-
-### Backend Debugging
+Start the frontend:
 
 ```bash
-# Enable logging
-NODE_ENV=development npm start
-
-# Check MongoDB connection
-mongosh mongodb://localhost:27017/eshop
+cd client
+npm run dev
 ```
 
-### Frontend Debugging
+Default addresses:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:5000`
+- Health check: `http://localhost:5000/api/health`
+
+## Staff Area Access
+
+The staff area uses the same login screen as regular users:
+
+- `http://localhost:5173/login`
+
+After login, access is controlled by role:
+
+- `admin`: can access `/staff`, `/staff/orders`, `/staff/support`, `/staff/products`, `/admin/users`
+- `supervisor`: can access `/staff`, `/staff/orders`, `/staff/support`, `/staff/products`
+- `employee`: can access `/staff`, `/staff/orders`, `/staff/support`
+
+If the database does not have a staff or admin account yet, create one with the backend script:
 
 ```bash
-# Check browser console for errors
-# Check Network tab for API calls
-# Check Application tab for localStorage tokens
-
-# Access React DevTools Chrome extension
-# Access Vite HMR in browser
+cd server
+npm run create:user -- --name="Admin CNM" --email=admin@example.com --password=StrongPass123 --role=admin
 ```
 
-### Common Issues
+You can replace `--role=admin` with `supervisor` or `employee`.
 
-**"CORS error"**
+Notes:
 
-- Check backend has CORS enabled
-- Check VITE_API_URL in frontend .env
+- This script creates a new user or updates the user if the email already exists.
+- Users created through the script are set to `isActive = true` and `isVerified = true`.
+- The user management screen is available only to the `admin` role.
 
-**"Token expired"**
+## Docker
 
-- Clear localStorage and login again
-- Check JWT_EXPIRE in backend .env
+The repository includes `docker-compose.yml` for development. By default, the `server` container reads `MONGO_URI` directly from `server/.env`, so it can use MongoDB Atlas or another MongoDB instance outside Docker.
 
-**"Image not uploading"**
+Start the stack:
 
-- Check Cloudinary credentials
-- Verify multer config
-- Check file size < 5MB
+```bash
+docker compose up --build
+```
 
-**"Email not sending"**
+Default endpoints:
 
-- Enable "Less secure app access" on Gmail
-- Use App Password for Gmail
-- Check EMAIL_USER and EMAIL_PASSWORD in .env
+- Backend: `http://localhost:5000`
+- Frontend: `http://localhost:5173`
 
-## Project Statistics
+To run a local MongoDB container instead of using Atlas, enable the `local-db` profile:
 
-- **Total Backend Files**: ~35 files
- - 8 domain modules × 5 files each = 40
- - +5 shared utilities
- - +1 central routes
- - = ~46 files
+```bash
+docker compose --profile local-db up --build
+```
 
-- **Total Frontend Files**: ~35 files
- - 9 domain pages
- - 7 shared components
- - 2 contexts
- - 1 API client
- - Config files (5)
- - = ~24 files
+With this profile enabled, local MongoDB is exposed at:
 
-## Next Steps
+- MongoDB: `localhost:27018`
 
-1. **Database Seeding**: Create sample products in MongoDB
-2. **Testing**: Write unit tests for critical functions
-3. **Documentation**: Create API documentation
-4. **Deployment**: Deploy to Heroku/AWS/DigitalOcean
-5. **Admin Panel**: Create admin CRUD interfaces
-6. **Analytics**: Add product view/purchase analytics
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+## Scripts
+
+### Root
+
+```bash
+npm test
+```
+
+### Backend
+
+```bash
+cd server
+npm run dev
+npm start
+npm test
+npm run test:watch
+npm run import:csv
+npm run create:user
+```
+
+### Frontend
+
+```bash
+cd client
+npm run dev
+npm run build
+npm run preview
+npm test
+npm run test:watch
+```
+
+## Testing
+
+This repository currently includes automated tests.
+
+- `npm test` from the repository root runs both server and client tests
+- The backend uses the Node built-in test runner
+- The frontend uses Vitest
+
+For manual API testing, use the collection in `postman/`.
+
+## Main API Groups
+
+- `/api/auth`
+- `/api/users`
+- `/api/products`
+- `/api/cart`
+- `/api/orders`
+- `/api/payments`
+- `/api/reviews`
+- `/api/chat`
+
+Notes:
+
+- `GET /api/health` is used for health checks
+- `/api/chat` allows guest access through optional authentication; operations involving orders, accounts, or personal data are controlled at the service layer
+
+## Related Documentation
+
+- `ARCHITECTURE.md`
+- `DATABASE_ERD.md`
+- `TEST_CASES.md`
+- `DEPLOYMENT_FREE.md`
+- `docs/`
+
+## Development Notes
+
+- The frontend calls the API through `client/src/api/axiosClient.js`
+- The backend registers routes in `server/src/routes.js`
+- The review module currently lives in `server/src/review` instead of `server/src/modules`
+- Docker development uses bind mounts for source code, so most backend and frontend changes reload without rebuilding the full image
 
 ## License
 
-MIT License - See LICENSE file
-
-## ‍ Author
-
-Built as a learning project demonstrating modular monolith architecture for e-commerce.
-
----
-
-**Happy Coding! **
+This repository does not currently include a dedicated license file. If the project is used outside internal or coursework contexts, add an explicit license.

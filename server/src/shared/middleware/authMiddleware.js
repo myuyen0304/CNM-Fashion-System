@@ -43,6 +43,28 @@ const protect = async (req, res, next) => {
   }
 };
 
+const optionalProtect = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return next();
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.userId).select("-password");
+    if (!user || user.isActive === false) {
+      return next();
+    }
+
+    req.user = user;
+    next();
+  } catch (_) {
+    next();
+  }
+};
+
 /**
  * Middleware kiểm tra role.
  * Dùng: router.get('/admin', protect, requireRole('admin'), controller)
@@ -67,4 +89,9 @@ const requireAnyStaffRole = requireRole(
   ROLES.EMPLOYEE,
 );
 
-module.exports = { protect, requireRole, requireAnyStaffRole };
+module.exports = {
+  protect,
+  optionalProtect,
+  requireRole,
+  requireAnyStaffRole,
+};

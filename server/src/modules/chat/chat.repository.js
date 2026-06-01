@@ -1,11 +1,49 @@
 const { ChatRoom, ChatMessage } = require("./chat.model");
 
 const findOrCreateRoom = async (customerId) => {
-  let room = await ChatRoom.findOne({ customerId });
-  if (!room) {
-    room = await ChatRoom.create({ customerId });
+  try {
+    return await ChatRoom.findOneAndUpdate(
+      { customerId, isGuestSession: false },
+      {
+        $setOnInsert: {
+          customerId,
+          isGuestSession: false,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ customerId, isGuestSession: false });
+    }
+    throw error;
   }
-  return room;
+};
+
+const findOrCreateGuestRoom = async (guestToken) => {
+  try {
+    return await ChatRoom.findOneAndUpdate(
+      { guestToken, isGuestSession: true },
+      {
+        $setOnInsert: {
+          isGuestSession: true,
+          guestToken,
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ guestToken, isGuestSession: true });
+    }
+    throw error;
+  }
 };
 
 const findRoomById = async (roomId) => {
@@ -13,7 +51,11 @@ const findRoomById = async (roomId) => {
 };
 
 const findRoomByCustomer = async (customerId) => {
-  return ChatRoom.findOne({ customerId });
+  return ChatRoom.findOne({ customerId, isGuestSession: false });
+};
+
+const findRoomByGuestToken = async (guestToken) => {
+  return ChatRoom.findOne({ guestToken, isGuestSession: true });
 };
 
 const listRooms = async ({ page = 1, limit = 20, status, keyword }) => {
@@ -31,12 +73,29 @@ const listRooms = async ({ page = 1, limit = 20, status, keyword }) => {
     ChatRoom.countDocuments(filter),
   ]);
 
+  const decoratedRooms = rooms.map((room) => {
+    const plainRoom = room.toObject();
+    const guestSuffix = String(plainRoom._id || "").slice(-6).toUpperCase();
+    const customerDisplayName =
+      plainRoom.customerId?.name ||
+      (plainRoom.isGuestSession ? `Guest ${guestSuffix}` : "Unknown user");
+    const customerDisplayEmail =
+      plainRoom.customerId?.email ||
+      (plainRoom.isGuestSession ? "Guest session" : "");
+
+    return {
+      ...plainRoom,
+      customerDisplayName,
+      customerDisplayEmail,
+    };
+  });
+
   const filteredRooms = keyword
-    ? rooms.filter((room) => {
-        const text = `${room.customerId?.name || ""} ${room.customerId?.email || ""}`.toLowerCase();
+    ? decoratedRooms.filter((room) => {
+        const text = `${room.customerDisplayName || ""} ${room.customerDisplayEmail || ""}`.toLowerCase();
         return text.includes(String(keyword).toLowerCase());
       })
-    : rooms;
+    : decoratedRooms;
 
   return {
     rooms: filteredRooms,
@@ -85,6 +144,26 @@ const assignAdminToRoom = async (roomId, adminId) => {
   return ChatRoom.findByIdAndUpdate(roomId, { adminId }, { new: true });
 };
 
+const attachRoomToCustomer = async (roomId, customerId) => {
+  try {
+    return await ChatRoom.findByIdAndUpdate(
+      roomId,
+      {
+        customerId,
+        isGuestSession: false,
+        guestToken: null,
+        updatedAt: new Date(),
+      },
+      { new: true },
+    );
+  } catch (error) {
+    if (error.code === 11000) {
+      return ChatRoom.findOne({ customerId, isGuestSession: false });
+    }
+    throw error;
+  }
+};
+
 const updateRoomStatus = async (roomId, payload) => {
   return ChatRoom.findByIdAndUpdate(
     roomId,
@@ -93,9 +172,44 @@ const updateRoomStatus = async (roomId, payload) => {
   );
 };
 
-/**
- * Lấy N tin nhắn gần nhất (dùng cho AI context)
- */
+const tryAcquireProcessingLock = async (
+  roomId,
+  lockToken,
+  ttlMs = 2 * 60 * 1000,
+) => {
+  const staleBefore = new Date(Date.now() - ttlMs);
+
+  return ChatRoom.findOneAndUpdate(
+    {
+      _id: roomId,
+      $or: [
+        { aiProcessing: { $ne: true } },
+        { aiProcessingStartedAt: { $lt: staleBefore } },
+      ],
+    },
+    {
+      aiProcessing: true,
+      aiProcessingToken: lockToken,
+      aiProcessingStartedAt: new Date(),
+      updatedAt: new Date(),
+    },
+    { new: true },
+  );
+};
+
+const releaseProcessingLock = async (roomId, lockToken) => {
+  return ChatRoom.findOneAndUpdate(
+    { _id: roomId, aiProcessingToken: lockToken },
+    {
+      aiProcessing: false,
+      aiProcessingToken: null,
+      aiProcessingStartedAt: null,
+      updatedAt: new Date(),
+    },
+    { new: true },
+  );
+};
+
 const getRecentMessages = async (roomId, limit = 10) => {
   return ChatMessage.find({ roomId })
     .sort({ sentAt: -1 })
@@ -105,8 +219,10 @@ const getRecentMessages = async (roomId, limit = 10) => {
 
 module.exports = {
   findOrCreateRoom,
+  findOrCreateGuestRoom,
   findRoomById,
   findRoomByCustomer,
+  findRoomByGuestToken,
   listRooms,
   saveMessage,
   countMessages,
@@ -114,5 +230,8 @@ module.exports = {
   getRecentMessages,
   updateRoomLastMessage,
   assignAdminToRoom,
+  attachRoomToCustomer,
   updateRoomStatus,
+  tryAcquireProcessingLock,
+  releaseProcessingLock,
 };

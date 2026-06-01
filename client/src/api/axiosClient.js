@@ -6,8 +6,15 @@ const notifyAuthStateChanged = () => {
   window.dispatchEvent(new Event("auth-state-changed"));
 };
 
+const clearStoredAuth = () => {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("user");
+  notifyAuthStateChanged();
+};
+
 const axiosClient = axios.create({
   baseURL: BASE_URL,
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -28,6 +35,10 @@ const shouldSkipRefresh = (requestUrl = "") => {
   return AUTH_PATHS_TO_SKIP_REFRESH.some((path) => requestUrl.includes(path));
 };
 
+const shouldClearAuthOnUnauthorized = (requestUrl = "") => {
+  return !String(requestUrl || "").includes("/auth/login");
+};
+
 const normalizeAuthErrorMessage = (status, requestUrl = "", message = "") => {
   const raw = String(message || "").trim();
   const lowered = raw
@@ -40,17 +51,19 @@ const normalizeAuthErrorMessage = (status, requestUrl = "", message = "") => {
     .trim();
 
   const isLoginRequest = String(requestUrl || "").includes("/auth/login");
+  const isUnauthorizedStatus = status === 401;
 
   if (
-    lowered.includes("chua dang nhap") ||
-    lowered.includes("vui long dang nhap") ||
-    lowered.includes("token khong hop le") ||
-    lowered.includes("token da het han")
+    isUnauthorizedStatus &&
+    !isLoginRequest &&
+    (lowered.includes("chua dang nhap") ||
+      lowered.includes("token khong hop le") ||
+      lowered.includes("token da het han"))
   ) {
     return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
   }
 
-  if (status === 401 && !isLoginRequest) {
+  if (isUnauthorizedStatus && !isLoginRequest) {
     return "Chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.";
   }
 
@@ -87,20 +100,20 @@ axiosClient.interceptors.response.use(
       };
     }
 
-    const refreshToken = localStorage.getItem("refreshToken");
     const canTryRefresh =
       error.response?.status === 401 &&
       !originalRequest?._retry &&
-      Boolean(refreshToken) &&
       !shouldSkipRefresh(originalRequest?.url);
 
     if (canTryRefresh) {
       originalRequest._retry = true;
 
       try {
-        const response = await axios.post(`${BASE_URL}/auth/refresh-token`, {
-          refreshToken,
-        });
+        const response = await axios.post(
+          `${BASE_URL}/auth/refresh-token`,
+          {},
+          { withCredentials: true },
+        );
 
         const { accessToken } = response.data;
         localStorage.setItem("accessToken", accessToken);
@@ -109,10 +122,7 @@ axiosClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return axiosClient(originalRequest);
       } catch (err) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-        notifyAuthStateChanged();
+        clearStoredAuth();
 
         // Tránh reload cứng ngay tại trang login để thông báo lỗi còn hiển thị.
         if (window.location.pathname !== "/login") {
@@ -121,6 +131,13 @@ axiosClient.interceptors.response.use(
 
         return Promise.reject(err);
       }
+    }
+
+    if (
+      error.response?.status === 401 &&
+      shouldClearAuthOnUnauthorized(originalRequest?.url)
+    ) {
+      clearStoredAuth();
     }
 
     return Promise.reject(error);

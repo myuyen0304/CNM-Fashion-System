@@ -5,12 +5,20 @@ const chatRoomSchema = new mongoose.Schema(
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null,
+    },
+    isGuestSession: {
+      type: Boolean,
+      default: false,
+    },
+    guestToken: {
+      type: String,
+      default: null,
     },
     adminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null, // null = AI bot xử lý
+      default: null,
     },
     lastMessage: String,
     status: {
@@ -30,6 +38,18 @@ const chatRoomSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    aiProcessing: {
+      type: Boolean,
+      default: false,
+    },
+    aiProcessingToken: {
+      type: String,
+      default: null,
+    },
+    aiProcessingStartedAt: {
+      type: Date,
+      default: null,
+    },
     updatedAt: {
       type: Date,
       default: Date.now,
@@ -38,14 +58,29 @@ const chatRoomSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Unique: 1 customer 1 room
-chatRoomSchema.index({ customerId: 1 }, { unique: true });
+chatRoomSchema.index(
+  { customerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      customerId: { $type: "objectId" },
+      isGuestSession: false,
+    },
+  },
+);
+chatRoomSchema.index(
+  { guestToken: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      guestToken: { $type: "string" },
+      isGuestSession: true,
+    },
+  },
+);
 
 const ChatRoom = mongoose.model("ChatRoom", chatRoomSchema);
 
-// ========================
-// CHAT MESSAGE
-// ========================
 const chatMessageSchema = new mongoose.Schema({
   roomId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -68,7 +103,7 @@ const chatMessageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ["text", "image", "status"],
+    enum: ["text", "image", "status", "auth_required"],
     default: "text",
   },
   sentAt: {

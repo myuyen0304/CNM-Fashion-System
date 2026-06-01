@@ -4,7 +4,6 @@ const ROUTE_LABELS = {
   home: "Trang chủ",
   shop: "Danh mục",
   "danh-muc": "Danh mục",
-  "bo-suu-tap": "Bộ Sưu Tập",
   "tin-tuc-thoi-trang": "Tin Tức Thời Trang",
   "tin-tuc": "Tin Tức Thời Trang",
   "khuyen-mai": "Khuyến Mãi",

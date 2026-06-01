@@ -15,13 +15,19 @@ const initSocket = (httpServer) => {
 
     // Join a chat room
     socket.on("joinRoom", (roomId) => {
-      socket.join(roomId);
-      console.log(`Socket ${socket.id} joined room ${roomId}`);
+      const normalizedRoomId = String(roomId || "");
+      if (!normalizedRoomId) return;
+
+      socket.join(normalizedRoomId);
+      console.log(`Socket ${socket.id} joined room ${normalizedRoomId}`);
     });
 
     // Leave a chat room
     socket.on("leaveRoom", (roomId) => {
-      socket.leave(roomId);
+      const normalizedRoomId = String(roomId || "");
+      if (!normalizedRoomId) return;
+
+      socket.leave(normalizedRoomId);
     });
 
     socket.on("disconnect", () => {

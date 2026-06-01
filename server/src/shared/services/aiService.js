@@ -1,57 +1,31 @@
-/**
- * AI Service
- * - extractFeatures: mock image embedding cho image search
- * - cosineSimilarity: tính độ tương đồng vector
- * - claudeChatbotReply: chatbot dùng Google Gemini API
- */
+const OpenAI = require("openai");
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+let deepseekClient;
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const getDeepSeekClient = () => {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
 
-// ========================
-// IMAGE SEARCH (mock)
-// ========================
-
-/**
- * Trích xuất feature vector từ ảnh (dùng cho image search).
- * TODO: Tích hợp AI thật (Python API / TensorFlow.js / OpenAI CLIP).
- * Mock: trả random vector 128 chiều.
- */
-const extractFeatures = async (imageBuffer) => {
-  const vector = Array.from({ length: 128 }, () => Math.random());
-  const magnitude = Math.sqrt(vector.reduce((sum, v) => sum + v * v, 0));
-  return vector.map((v) => v / magnitude);
-};
-
-/**
- * Tính cosine similarity giữa 2 vector.
- */
-const cosineSimilarity = (vecA, vecB) => {
-  if (vecA.length !== vecB.length) return 0;
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-  for (let i = 0; i < vecA.length; i++) {
-    dotProduct += vecA[i] * vecB[i];
-    magnitudeA += vecA[i] * vecA[i];
-    magnitudeB += vecB[i] * vecB[i];
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY is required for chatbot responses.");
   }
-  magnitudeA = Math.sqrt(magnitudeA);
-  magnitudeB = Math.sqrt(magnitudeB);
-  if (magnitudeA === 0 || magnitudeB === 0) return 0;
-  return dotProduct / (magnitudeA * magnitudeB);
+
+  if (!deepseekClient) {
+    deepseekClient = new OpenAI({
+      apiKey,
+      baseURL: "https://api.deepseek.com",
+    });
+  }
+
+  return deepseekClient;
 };
 
-// ========================
-// CHATBOT (Google Gemini API)
-// ========================
+const MODEL = "deepseek-chat";
 
-const SYSTEM_PROMPT = `Bạn là trợ lý AI của cửa hàng thời trang online EShop. Hãy hỗ trợ khách hàng bằng tiếng Việt, thân thiện và ngắn gọn.
+const SYSTEM_PROMPT = `Bạn là trợ lý AI của cửa hàng thời trang online EShop. Hỗ trợ khách hàng bằng tiếng Việt, thân thiện và ngắn gọn.
 
 THÔNG TIN CỬA HÀNG:
 - Tên: EShop — cửa hàng thời trang online
-- Danh mục sản phẩm: áo, quần, váy, phụ kiện, giày dép
+- Danh mục: áo, quần, váy, đầm, giày dép, phụ kiện
 
 CHÍNH SÁCH GIAO HÀNG:
 - Giao hàng tiêu chuẩn: 3-5 ngày, phí 20.000đ
@@ -64,82 +38,157 @@ CHÍNH SÁCH ĐỔI TRẢ:
 - Liên hệ hotline hoặc email để được hỗ trợ
 
 PHƯƠNG THỨC THANH TOÁN:
-- VNPay (thẻ ATM nội địa, visa, mastercard)
+- VNPay (thẻ ATM nội địa, Visa, Mastercard)
 - MoMo
 - PayPal
 
 TRẠNG THÁI ĐƠN HÀNG:
 - "Chờ thanh toán" → "Đã thanh toán" → "Đang giao" → "Hoàn tất"
 - Có thể hủy đơn khi ở trạng thái "Chờ thanh toán"
+- Không thể hủy khi đơn đang giao hoặc đã hoàn tất
 
 LIÊN HỆ HỖ TRỢ:
 - Hotline: 1900-xxxx (8:00–22:00 mỗi ngày)
 - Email: support@eshop.vn
 
 QUY TẮC TRẢ LỜI:
-1. Trả lời bằng tiếng Việt, thân thiện và ngắn gọn (tối đa 3-4 câu)
-2. Nếu khách hỏi về sản phẩm cụ thể và bạn được cung cấp danh sách sản phẩm, hãy gợi ý sản phẩm phù hợp theo định dạng: [[Tên sản phẩm|productId]]
-3. Không bịa thông tin không có trong context
-4. Nếu câu hỏi nằm ngoài phạm vi hỗ trợ (khiếu nại phức tạp, tranh chấp, vấn đề kỹ thuật hệ thống), hãy chỉ trả lời đúng 1 từ: ESCALATE_TO_ADMIN`;
+1. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa 3-4 câu).
+2. Khi được cung cấp danh sách sản phẩm, gợi ý sản phẩm phù hợp theo đúng định dạng: [[Tên sản phẩm|productId]] (không thay đổi định dạng này, dùng đúng productId từ danh sách).
+3. Khi được cung cấp thông tin đơn hàng của khách, hãy trả lời dựa trên dữ liệu đó — không bịa thêm thông tin.
+4. Không bịa thông tin không có trong context.
+5. Nếu câu hỏi nằm ngoài phạm vi hỗ trợ (khiếu nại phức tạp, tranh chấp, vấn đề kỹ thuật hệ thống), chỉ trả lời đúng 1 từ: ESCALATE_TO_ADMIN`;
 
-/**
- * Chatbot thông minh dùng Google Gemini API.
- * @param {string} message - Tin nhắn của khách hàng
- * @param {Array} history - Lịch sử tin nhắn [{senderRole, content}]
- * @param {Array} productContext - Danh sách sản phẩm liên quan [{_id, name, price, category, avgRating, stock}]
- * @returns {string|null} - Câu trả lời hoặc null (cần chuyển admin)
- */
-const claudeChatbotReply = async (message, history = [], productContext = []) => {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-  });
+const ESCALATE_SENTINEL = "ESCALATE_TO_ADMIN";
 
-  // Build history theo định dạng Gemini: role "user" hoặc "model"
-  const geminiHistory = [];
+const buildMessages = (message, history, productContext, orderContext, customerName) => {
+  const systemContent = customerName
+    ? `${SYSTEM_PROMPT}\n\nKhách hàng đang chat tên là: ${customerName}. Hãy gọi tên khách khi phù hợp để thân thiện hơn.`
+    : SYSTEM_PROMPT;
+  const messages = [{ role: "system", content: systemContent }];
+
   for (const msg of history) {
     if (msg.senderRole === "customer") {
-      geminiHistory.push({ role: "user", parts: [{ text: msg.content }] });
+      messages.push({ role: "user", content: msg.content });
     } else if (msg.senderRole === "bot" || msg.senderRole === "admin") {
-      geminiHistory.push({ role: "model", parts: [{ text: msg.content }] });
+      messages.push({ role: "assistant", content: msg.content });
     }
   }
 
-  // Loại bỏ consecutive same role và đảm bảo bắt đầu bằng user
-  const validHistory = [];
-  let lastRole = null;
-  for (const msg of geminiHistory) {
-    if (msg.role !== lastRole) {
-      validHistory.push(msg);
-      lastRole = msg.role;
-    }
-  }
-  if (validHistory.length > 0 && validHistory[0].role === "model") {
-    validHistory.shift();
-  }
-
-  // Build user message cuối (có thể kèm product context)
   let userContent = message;
+
   if (productContext.length > 0) {
     const productList = productContext
       .map(
         (p) =>
-          `- ID: ${p._id} | Tên: ${p.name} | Giá: ${p.price.toLocaleString("vi-VN")}đ | Danh mục: ${p.category} | Đánh giá: ${p.avgRating || 0}/5 | Còn hàng: ${p.stock > 0 ? "Có" : "Hết"}`,
+          `- ID: ${p._id} | Tên: ${p.name} | Giá: ${p.price?.toLocaleString("vi-VN") ?? 0}đ | Danh mục: ${p.category} | Đánh giá: ${p.avgRating || 0}/5 | Còn hàng: ${(p.stock ?? 1) > 0 ? "Có" : "Hết"}`,
       )
       .join("\n");
-    userContent = `${message}\n\n[Danh sách sản phẩm liên quan từ hệ thống:]\n${productList}`;
+    userContent += `\n\n[Danh sách sản phẩm liên quan từ hệ thống:]\n${productList}`;
   }
 
-  const chat = model.startChat({ history: validHistory });
-  const result = await chat.sendMessage(userContent);
-  const replyText = result.response.text().trim();
+  if (orderContext.length > 0) {
+    const orderList = orderContext
+      .map((o) => {
+        const items = (o.items || [])
+          .map((i) => `${i.name} x${i.quantity} (${(i.unitPrice || 0).toLocaleString("vi-VN")}đ)`)
+          .join(", ");
+        const date = o.createdAt
+          ? new Date(o.createdAt).toLocaleDateString("vi-VN")
+          : "N/A";
+        return `- Mã đơn: ${o._id} | Ngày: ${date} | Trạng thái: ${o.status} | Tổng tiền: ${(o.totalAmount || 0).toLocaleString("vi-VN")}đ | Sản phẩm: ${items || "N/A"}`;
+      })
+      .join("\n");
+    userContent += `\n\n[Thông tin đơn hàng gần đây của khách:]\n${orderList}`;
+  }
 
-  // Nếu bot yêu cầu escalate → trả null để chuyển admin
-  if (!replyText || replyText === "ESCALATE_TO_ADMIN") {
+  messages.push({ role: "user", content: userContent });
+  return messages;
+};
+
+/**
+ * Chatbot reply (non-streaming, giữ lại để dùng khi cần).
+ */
+const claudeChatbotReply = async (message, history = [], productContext = [], orderContext = [], customerName = "") => {
+  const messages = buildMessages(message, history, productContext, orderContext, customerName);
+
+  const completion = await getDeepSeekClient().chat.completions.create({
+    model: MODEL,
+    messages,
+  });
+
+  const replyText = completion.choices[0]?.message?.content?.trim() ?? "";
+
+  if (!replyText || replyText.includes(ESCALATE_SENTINEL)) {
     return null;
   }
-
   return replyText;
 };
 
-module.exports = { extractFeatures, cosineSimilarity, claudeChatbotReply };
+/**
+ * Chatbot reply (streaming).
+ * @param {string} message
+ * @param {Array} history - [{senderRole, content}]
+ * @param {Array} productContext
+ * @param {Array} orderContext
+ * @param {Function} onChunk - gọi với mỗi text chunk
+ * @param {Function} onDone - gọi với full text khi xong (null = escalate)
+ */
+const claudeChatbotReplyStream = async (
+  message,
+  history = [],
+  productContext = [],
+  orderContext = [],
+  onChunk,
+  onDone,
+  customerName = "",
+) => {
+  const messages = buildMessages(message, history, productContext, orderContext, customerName);
+
+  const stream = await getDeepSeekClient().chat.completions.create({
+    model: MODEL,
+    messages,
+    stream: true,
+  });
+
+  let fullText = "";
+  let buffer = "";
+  let escalateDecided = false;
+
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content ?? "";
+    if (!text) continue;
+
+    if (!escalateDecided) {
+      buffer += text;
+      if (buffer.length >= ESCALATE_SENTINEL.length + 5 || buffer.includes("ESCALATE")) {
+        escalateDecided = true;
+        if (buffer.startsWith("ESCALATE") || buffer.includes(ESCALATE_SENTINEL)) {
+          await onDone(null);
+          return;
+        }
+        fullText += buffer;
+        onChunk(buffer);
+        buffer = "";
+      }
+    } else {
+      fullText += text;
+      onChunk(text);
+    }
+  }
+
+  // Flush buffer nếu response quá ngắn
+  if (!escalateDecided) {
+    if (buffer.startsWith("ESCALATE") || buffer.includes(ESCALATE_SENTINEL)) {
+      await onDone(null);
+      return;
+    }
+    if (buffer) {
+      fullText += buffer;
+      onChunk(buffer);
+    }
+  }
+
+  await onDone(fullText.trim() || null);
+};
+
+module.exports = { claudeChatbotReply, claudeChatbotReplyStream };

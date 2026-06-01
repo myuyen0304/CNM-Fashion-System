@@ -4,6 +4,7 @@ import axiosClient from "../../api/axiosClient";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const REGISTER_TIMEOUT_MS = 45000;
 const COMMON_DOMAIN_TYPOS = {
   "gmail.co": "gmail.com",
   "gmail.con": "gmail.com",
@@ -16,6 +17,18 @@ const COMMON_DOMAIN_TYPOS = {
 const getTypoSuggestion = (email) => {
   const domain = email.split("@")[1] || "";
   return COMMON_DOMAIN_TYPOS[domain] || "";
+};
+
+const getRegisterErrorMessage = (err) => {
+  if (err.code === "ECONNABORTED") {
+    return "Máy chủ đang khởi động hoặc email gửi quá lâu. Vui lòng thử lại sau.";
+  }
+
+  if (!err.response) {
+    return "Không kết nối được đến máy chủ. Vui lòng kiểm tra mạng hoặc URL API.";
+  }
+
+  return err.response?.data?.message || "Lỗi đăng ký. Vui lòng thử lại.";
 };
 
 export default function RegisterPage() {
@@ -61,21 +74,33 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await axiosClient.post("/auth/register", {
-        name: formData.name.trim(),
-        email: normalizedEmail,
-        password: formData.password,
-      });
+      const response = await axiosClient.post(
+        "/auth/register",
+        {
+          name: formData.name.trim(),
+          email: normalizedEmail,
+          password: formData.password,
+        },
+        {
+          timeout: REGISTER_TIMEOUT_MS,
+        },
+      );
+      const responseMessage =
+        response.data?.debugOtp
+          ? `${response.data?.message || "OTP demo đã được tạo."} OTP demo: ${
+              response.data.debugOtp
+            }`
+          : response.data?.message ||
+            "OTP xác thực đã được gửi đến email của bạn.";
+
       navigate("/verify-email", {
         state: {
           email: response.data?.email || normalizedEmail,
-          message:
-            response.data?.message ||
-            "OTP xác thực đã được gửi đến email của bạn.",
+          message: responseMessage,
         },
       });
     } catch (err) {
-      setError(err.response?.data?.message || "Lỗi đăng ký");
+      setError(getRegisterErrorMessage(err));
     } finally {
       setLoading(false);
     }

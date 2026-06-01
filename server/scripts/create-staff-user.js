@@ -6,8 +6,14 @@ const { ROLES } = require("../src/shared/constants");
 
 const parseArg = (name) => {
   const raw = process.argv.find((arg) => arg.startsWith(`--${name}=`));
-  if (!raw) return "";
-  return raw.slice(name.length + 3).trim();
+  if (raw) return raw.slice(name.length + 3).trim();
+
+  const separateValueIndex = process.argv.findIndex((arg) => arg === `--${name}`);
+  if (separateValueIndex !== -1 && process.argv[separateValueIndex + 1]) {
+    return process.argv[separateValueIndex + 1].trim();
+  }
+
+  return (process.env[`npm_config_${name}`] || "").trim();
 };
 
 const run = async () => {
@@ -39,6 +45,7 @@ const run = async () => {
       existing.password = hashed;
       existing.role = role;
       existing.isActive = true;
+      existing.isVerified = true;
       await existing.save();
       console.log(`Updated user ${email} with role ${role}`);
     } else {
@@ -48,6 +55,7 @@ const run = async () => {
         password: hashed,
         role,
         isActive: true,
+        isVerified: true,
       });
       console.log(`Created user ${email} with role ${role}`);
     }

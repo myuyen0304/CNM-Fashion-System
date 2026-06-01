@@ -1,4 +1,4 @@
-const { protect, requireRole } = require("./shared/middleware/authMiddleware");
+const { protect, optionalProtect } = require("./shared/middleware/authMiddleware");
 
 // Import all route modules
 const authRoutes = require("./modules/auth/auth.routes");
@@ -25,7 +25,7 @@ const setupRoutes = (app) => {
   app.use("/api/cart", protect, cartRoutes);
   app.use("/api/orders", protect, orderRoutes);
   app.use("/api/reviews", reviewRoutes);
-  app.use("/api/chat", protect, chatRoutes);
+  app.use("/api/chat", optionalProtect, chatRoutes);
 };
 
 module.exports = setupRoutes;

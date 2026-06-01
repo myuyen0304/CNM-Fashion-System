@@ -83,12 +83,6 @@ const filterProducts = catchAsync(async (req, res) => {
   res.json({ success: true, data: result });
 });
 
-// UC-03: Tìm kiếm bằng hình ảnh
-const imageSearch = catchAsync(async (req, res) => {
-  const products = await productService.imageSearch(req.file);
-  res.json({ success: true, data: products });
-});
-
 // UC-04: Chi tiết sản phẩm
 const getProductDetail = catchAsync(async (req, res) => {
   const product = await productService.getDetail(req.params.id);
@@ -97,7 +91,8 @@ const getProductDetail = catchAsync(async (req, res) => {
 
 // Sản phẩm tương tự
 const getSimilarProducts = catchAsync(async (req, res) => {
-  const products = await productService.getSimilar(req.params.id);
+  const limit = Math.min(parseInt(req.query.limit, 10) || 12, 24);
+  const products = await productService.getSimilar(req.params.id, limit);
   res.json({ success: true, data: products });
 });
 
@@ -193,7 +188,6 @@ const deleteCategory = catchAsync(async (req, res) => {
 module.exports = {
   searchByKeyword,
   filterProducts,
-  imageSearch,
   getProductDetail,
   getSimilarProducts,
   getRecommendations,

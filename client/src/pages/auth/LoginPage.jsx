@@ -2,6 +2,13 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
+const unaccent = (value) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[đĐ]/g, "d")
+    .toLowerCase();
+
 export default function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
@@ -10,6 +17,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const successMessage = location.state?.message || "";
+  const nextPath = location.state?.from?.pathname || "/";
+  const normalizedError = unaccent(error);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,7 +27,7 @@ export default function LoginPage() {
 
     try {
       await login(formData.email, formData.password);
-      navigate("/");
+      navigate(nextPath, { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "Lỗi đăng nhập");
     } finally {
@@ -75,7 +84,7 @@ export default function LoginPage() {
             Quên mật khẩu?
           </Link>
         </p>
-        {error.toLowerCase().includes("chưa được xác thực") && (
+        {normalizedError.includes("chua duoc xac thuc") && (
           <p>
             <button
               type="button"

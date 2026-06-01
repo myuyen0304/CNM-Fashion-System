@@ -9,7 +9,6 @@ import logoImage from "../assets/images/logo.png";
 const BASE_MENU_ITEMS = [
   { label: "TRANG CHỦ", to: "/Home" },
   { label: "DANH MỤC", to: "/Danh-muc" },
-  { label: "BỘ SƯU TẬP", to: "/bo-suu-tap" },
   { label: "TIN TỨC THỜI TRANG", to: "/tin-tuc-thoi-trang" },
   { label: "TRỢ GIÚP", to: "/tro-giup" },
   { label: "KHUYẾN MÃI", to: "/Khuyen-mai", highlight: true },

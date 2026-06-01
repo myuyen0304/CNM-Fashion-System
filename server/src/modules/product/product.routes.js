@@ -13,11 +13,6 @@ router.get("/popular", productController.getPopularProducts);
 router.get("/categories", productController.getCategories);
 router.get("/search", productController.searchByKeyword);
 router.get("/filter", productController.filterProducts);
-router.post(
-  "/image-search",
-  upload.single("image"),
-  productController.imageSearch,
-);
 router.get("/recommendations", productController.getPublicRecommendations);
 router.get(
   "/recommendations/me",

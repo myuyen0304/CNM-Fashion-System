@@ -65,7 +65,6 @@ const importCSV = async () => {
           category: row.category || "Khác",
           sizes: parseSizes(row.size),
           images: [row.image],
-          imageVector: [],
           status: "active",
           viewCount: Math.floor(Math.random() * 500),
           soldCount: soldCount,

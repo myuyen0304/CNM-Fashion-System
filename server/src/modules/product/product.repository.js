@@ -61,8 +61,14 @@ const listActiveCategories = async () => {
     .sort((a, b) => a.localeCompare(b, "vi"));
 };
 
-const findById = async (id) => {
-  return Product.findById(id);
+const findById = async (id, options = {}) => {
+  let query = Product.findById(id);
+
+  if (options.session) {
+    query = query.session(options.session);
+  }
+
+  return query;
 };
 
 const findPopular = async (page = 1, limit = 40) => {
@@ -158,30 +164,42 @@ const findByKeyword = async (keyword, criteria = {}, page = 1, limit = 12) => {
       break;
   }
 
-  const [allProducts, total] = await Promise.all([
-    usePopularFormula
-      ? Product.aggregate([
-          { $match: filter },
-          { $addFields: { popularScore: buildPopularScoreExpression() } },
-          { $sort: POPULAR_SORT },
-        ])
-      : Product.find(filter).sort(sort).lean(),
+  const kw = keyword.toLowerCase();
+  const matchPriority = {
+    $switch: {
+      branches: [
+        { case: { $eq: [{ $toLower: "$name" }, kw] }, then: 0 },
+        {
+          case: {
+            $regexMatch: {
+              input: { $toLower: "$name" },
+              regex: `^${escapeRegExp(kw)}`,
+            },
+          },
+          then: 1,
+        },
+      ],
+      default: 2,
+    },
+  };
+
+  const addFields = { _matchPriority: matchPriority };
+  if (usePopularFormula) addFields.popularScore = buildPopularScoreExpression();
+
+  const finalSort = usePopularFormula
+    ? { _matchPriority: 1, ...POPULAR_SORT }
+    : { _matchPriority: 1, ...sort };
+
+  const [products, total] = await Promise.all([
+    Product.aggregate([
+      { $match: filter },
+      { $addFields: addFields },
+      { $sort: finalSort },
+      { $skip: skip },
+      { $limit: limit },
+    ]),
     Product.countDocuments(filter),
   ]);
-
-  // Sắp xếp lại: exact match name lên đầu, tiếp theo startsWith, rồi contains
-  const kw = keyword.toLowerCase();
-  const exactMatch = [];
-  const startsWithMatch = [];
-  const rest = [];
-  for (const p of allProducts) {
-    const nameLower = (p.name || "").toLowerCase();
-    if (nameLower === kw) exactMatch.push(p);
-    else if (nameLower.startsWith(kw)) startsWithMatch.push(p);
-    else rest.push(p);
-  }
-  const sorted = [...exactMatch, ...startsWithMatch, ...rest];
-  const products = sorted.slice(skip, skip + limit);
 
   return { products, total, page, totalPages: Math.ceil(total / limit) };
 };
@@ -311,17 +329,6 @@ const findByCriteria = async (criteria, page = 1, limit = 12) => {
   return { products, total, page, totalPages: Math.ceil(total / limit) };
 };
 
-/**
- * Tìm sản phẩm tương tự bằng imageVector (cosine similarity).
- * Query tất cả sản phẩm có imageVector, tính similarity ở application layer.
- */
-const findAllWithVector = async () => {
-  return Product.find({
-    status: "active",
-    imageVector: { $exists: true, $not: { $size: 0 } },
-  }).select("_id name price images imageVector category");
-};
-
 const findActiveByIds = async (ids = []) => {
   const normalizedIds = (Array.isArray(ids) ? ids : [])
     .map((id) => String(id || "").trim())
@@ -373,14 +380,35 @@ const findActiveByCategories = async (
 /**
  * Tìm sản phẩm tương tự (cùng category, trừ chính nó)
  */
-const findSimilar = async (productId, category, limit = 6) => {
-  return Product.find({
+const findSimilar = async (productId, category, price, limit = 6) => {
+  const SELECT_FIELDS = "name price category images avgRating soldCount stock sizes";
+
+  // Ưu tiên: cùng category + tầm giá ±50%
+  const inRange = await Product.find({
     _id: { $ne: productId },
+    category,
+    status: "active",
+    price: { $gte: price * 0.5, $lte: price * 1.5 },
+  })
+    .sort({ soldCount: -1, avgRating: -1 })
+    .limit(limit)
+    .select(SELECT_FIELDS);
+
+  if (inRange.length >= limit) return inRange;
+
+  // Fallback: cùng category, bất kể giá
+  const remaining = limit - inRange.length;
+  const inRangeIds = inRange.map((p) => p._id);
+  const fallback = await Product.find({
+    _id: { $ne: productId, $nin: inRangeIds },
     category,
     status: "active",
   })
     .sort({ soldCount: -1 })
-    .limit(limit);
+    .limit(remaining)
+    .select(SELECT_FIELDS);
+
+  return [...inRange, ...fallback];
 };
 
 /**
@@ -409,19 +437,25 @@ const updateAvgRating = async (productId, avgRating) => {
 /**
  * Giảm stock sau khi đặt hàng
  */
-const decreaseStock = async (productId, quantity) => {
-  return Product.findByIdAndUpdate(productId, {
-    $inc: { stock: -quantity, soldCount: quantity },
-  });
+const decreaseStock = async (productId, quantity, options = {}) => {
+  return Product.findOneAndUpdate(
+    { _id: productId, stock: { $gte: quantity } },
+    { $inc: { stock: -quantity, soldCount: quantity } },
+    { new: true, session: options.session },
+  );
 };
 
 /**
  * Tăng stock khi hủy đơn
  */
-const increaseStock = async (productId, quantity) => {
-  return Product.findByIdAndUpdate(productId, {
-    $inc: { stock: quantity, soldCount: -quantity },
-  });
+const increaseStock = async (productId, quantity, options = {}) => {
+  return Product.findByIdAndUpdate(
+    productId,
+    {
+      $inc: { stock: quantity, soldCount: -quantity },
+    },
+    { session: options.session },
+  );
 };
 
 // ========================
@@ -514,7 +548,6 @@ module.exports = {
   findByKeyword,
   findByTextSearch,
   findByCriteria,
-  findAllWithVector,
   findActiveByIds,
   findActiveByCategories,
   findSimilar,

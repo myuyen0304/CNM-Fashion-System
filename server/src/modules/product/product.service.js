@@ -1,9 +1,5 @@
 const ApiError = require("../../shared/utils/ApiError");
 const { escapeRegex } = require("../../shared/utils/normalize");
-const {
-  extractFeatures,
-  cosineSimilarity,
-} = require("../../shared/services/aiService");
 const { uploadToCloudinary } = require("../../config/cloudinary");
 const productRepo = require("./product.repository");
 const orderRepo = require("../order/order.repository");
@@ -84,32 +80,6 @@ const filter = async (criteria, page) => {
 };
 
 /**
- * UC-03: Tìm kiếm bằng hình ảnh
- */
-const imageSearch = async (file) => {
-  if (!file) throw new ApiError(400, "Vui lòng tải lên 1 ảnh.");
-
-  // Trích xuất feature vector từ ảnh
-  const queryVector = await extractFeatures(file.buffer);
-
-  // Lấy tất cả sản phẩm có imageVector
-  const products = await productRepo.findAllWithVector();
-
-  // Tính cosine similarity, sắp xếp theo similarity giảm dần
-  const scored = products
-    .map((p) => ({
-      product: p,
-      similarity: cosineSimilarity(queryVector, p.imageVector),
-    }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 12) // Top 12 kết quả
-    .filter((s) => s.similarity > 0.1) // Loại bỏ kết quả quá thấp
-    .map((s) => s.product);
-
-  return scored;
-};
-
-/**
  * UC-04: Xem chi tiết sản phẩm
  */
 const getDetail = async (productId) => {
@@ -135,11 +105,11 @@ const getDetail = async (productId) => {
 /**
  * Sản phẩm gợi ý (cùng category)
  */
-const getSimilar = async (productId) => {
+const getSimilar = async (productId, limit = 12) => {
   const product = await productRepo.findById(productId);
   if (!product) throw new ApiError(404, "Không tìm thấy sản phẩm.");
 
-  return productRepo.findSimilar(productId, product.category);
+  return productRepo.findSimilar(productId, product.category, product.price, limit);
 };
 
 const getRecommendations = async ({ userId, currentProductId, limit = 8 }) => {
@@ -412,7 +382,6 @@ const deleteCategory = async ({ name, moveTo }) => {
 module.exports = {
   search,
   filter,
-  imageSearch,
   getDetail,
   getSimilar,
   getRecommendations,

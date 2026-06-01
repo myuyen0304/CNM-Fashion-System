@@ -21,6 +21,10 @@ const updateUser = async (userId, updates) => {
   return User.findByIdAndUpdate(userId, updates, { new: true });
 };
 
+const deleteUserById = async (userId) => {
+  return User.findByIdAndDelete(userId);
+};
+
 const updatePassword = async (userId, hashedPassword) => {
   return User.findByIdAndUpdate(
     userId,
@@ -63,6 +67,7 @@ const upsertOtpToken = async ({
   purpose,
   otpHash,
   expiresAt,
+  attempts = 0,
   resendCount,
   lastSentAt,
 }) => {
@@ -74,7 +79,7 @@ const upsertOtpToken = async ({
       purpose,
       otpHash,
       expiresAt,
-      attempts: 0,
+      attempts,
       resendCount,
       lastSentAt,
     },
@@ -107,6 +112,7 @@ module.exports = {
   findUserById,
   createUser,
   updateUser,
+  deleteUserById,
   updatePassword,
   saveRefreshToken,
   findRefreshToken,

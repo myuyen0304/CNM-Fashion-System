@@ -1,30 +1,42 @@
 const chatService = require("./chat.service");
 const catchAsync = require("../../shared/utils/catchAsync");
 
+const getChatActor = (req) => ({
+  user: req.user || null,
+  guestToken: req.get("x-chat-session") || "",
+});
+
 const getOrCreateRoom = catchAsync(async (req, res) => {
-  const room = await chatService.getOrCreateRoom(req.user._id);
+  const room = await chatService.getOrCreateRoom(getChatActor(req));
   res.json({ success: true, data: room });
 });
 
 const sendMessage = catchAsync(async (req, res) => {
   const { roomId } = req.params;
-  const result = await chatService.sendMessage(req.user._id, roomId, req.body);
+  const result = await chatService.sendMessage(
+    getChatActor(req),
+    roomId,
+    req.body,
+  );
   res.status(201).json({ success: true, data: result });
 });
 
 const getMessages = catchAsync(async (req, res) => {
   const result = await chatService.getMessages(
-    req.user._id,
-    parseInt(req.query.page) || 1,
+    getChatActor(req),
+    req.params.roomId,
+    parseInt(req.query.page, 10) || 1,
   );
   res.json({ success: true, data: result });
 });
 
 const confirmResolution = catchAsync(async (req, res) => {
   const { roomId } = req.params;
-  const result = await chatService.sendMessage(req.user._id, roomId, {
-    content: req.body.resolved ? "đã giải quyêt" : "chưa",
-  });
+  const result = await chatService.confirmResolution(
+    getChatActor(req),
+    roomId,
+    Boolean(req.body.resolved),
+  );
   res.status(201).json({ success: true, data: result });
 });
 
@@ -68,7 +80,10 @@ const sendMessageByStaff = catchAsync(async (req, res) => {
 });
 
 const assignRoomToSelf = catchAsync(async (req, res) => {
-  const room = await chatService.assignRoomToStaff(req.params.roomId, req.user._id);
+  const room = await chatService.assignRoomToStaff(
+    req.params.roomId,
+    req.user._id,
+  );
   res.json({ success: true, data: room });
 });
 
