@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import axiosClient from "../../api/axiosClient";
+import { useAuth } from "../../contexts/AuthContext";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import StaffLayout from "../../components/StaffLayout";
 
 export default function ProductsManagementPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -14,6 +16,7 @@ export default function ProductsManagementPage() {
   const [deleteName, setDeleteName] = useState("");
   const [moveTo, setMoveTo] = useState("");
   const [keyword, setKeyword] = useState("");
+  const canManageCategories = user?.role === "supervisor";
 
   const loadProducts = async (targetPage = page) => {
     try {
@@ -127,49 +130,51 @@ export default function ProductsManagementPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        <div className="card p-4">
-          <h2 className="font-semibold mb-3">Đổi Tên Danh Mục</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input
-              className="input-field"
-              placeholder="Từ danh mục"
-              value={renameFrom}
-              onChange={(e) => setRenameFrom(e.target.value)}
-            />
-            <input
-              className="input-field"
-              placeholder="Sang danh mục"
-              value={renameTo}
-              onChange={(e) => setRenameTo(e.target.value)}
-            />
-            <button className="btn-primary" onClick={handleRenameCategory}>
-              Đổi Tên
-            </button>
+      {canManageCategories && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div className="card p-4">
+            <h2 className="font-semibold mb-3">Đổi Tên Danh Mục</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                className="input-field"
+                placeholder="Từ danh mục"
+                value={renameFrom}
+                onChange={(e) => setRenameFrom(e.target.value)}
+              />
+              <input
+                className="input-field"
+                placeholder="Sang danh mục"
+                value={renameTo}
+                onChange={(e) => setRenameTo(e.target.value)}
+              />
+              <button className="btn-primary" onClick={handleRenameCategory}>
+                Đổi Tên
+              </button>
+            </div>
           </div>
-        </div>
 
-        <div className="card p-4">
-          <h2 className="font-semibold mb-3">Xóa Danh Mục (Tùy Chọn Chuyển)</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input
-              className="input-field"
-              placeholder="Xóa danh mục"
-              value={deleteName}
-              onChange={(e) => setDeleteName(e.target.value)}
-            />
-            <input
-              className="input-field"
-              placeholder="Chuyển sản phẩm đến (tùy chọn)"
-              value={moveTo}
-              onChange={(e) => setMoveTo(e.target.value)}
-            />
-            <button className="btn-danger" onClick={handleDeleteCategory}>
-              Xóa
-            </button>
+          <div className="card p-4">
+            <h2 className="font-semibold mb-3">Xóa Danh Mục (Tùy Chọn Chuyển)</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <input
+                className="input-field"
+                placeholder="Xóa danh mục"
+                value={deleteName}
+                onChange={(e) => setDeleteName(e.target.value)}
+              />
+              <input
+                className="input-field"
+                placeholder="Chuyển sản phẩm đến (tùy chọn)"
+                value={moveTo}
+                onChange={(e) => setMoveTo(e.target.value)}
+              />
+              <button className="btn-danger" onClick={handleDeleteCategory}>
+                Xóa
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="card p-4 mb-6">
         <h2 className="font-semibold mb-3">Danh Mục Hiện Tại</h2>

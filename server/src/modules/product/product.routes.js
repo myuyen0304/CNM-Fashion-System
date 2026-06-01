@@ -42,13 +42,13 @@ router.get(
 router.patch(
   "/admin/categories/rename",
   protect,
-  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  requireRole(ROLES.SUPERVISOR),
   productController.renameCategory,
 );
 router.delete(
   "/admin/categories/:name",
   protect,
-  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR),
+  requireRole(ROLES.SUPERVISOR),
   productController.deleteCategory,
 );
 router.post(
