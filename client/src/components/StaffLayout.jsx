@@ -1,15 +1,41 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+const STAFF_NAV_ITEMS = [
+  {
+    to: "/staff",
+    label: "DASH BOARD",
+    end: true,
+    roles: ["admin", "supervisor", "employee"],
+  },
+  {
+    to: "/admin/users",
+    label: "Người dùng",
+    roles: ["admin"],
+  },
+  {
+    to: "/staff/products",
+    label: "Sản Phẩm & Hàng Tồn Kho",
+    roles: ["admin", "supervisor"],
+  },
+  {
+    to: "/staff/orders",
+    label: "Đơn Hàng",
+    roles: ["admin", "supervisor", "employee"],
+  },
+  {
+    to: "/staff/support",
+    label: "Chat hỗ trợ",
+    roles: ["admin", "supervisor", "employee"],
+  },
+];
+
 export default function StaffLayout({ title, subtitle, children }) {
   const { user } = useAuth();
   const role = user?.role || "";
-
-  const canUsers = role === "admin";
-  const canProducts = role === "admin" || role === "supervisor";
-  const canOrders =
-    role === "admin" || role === "supervisor" || role === "employee";
-  const canSupport = canOrders;
+  const navItems = STAFF_NAV_ITEMS.filter((item) =>
+    item.roles.includes(role),
+  );
 
   const baseLinkClass =
     "block rounded-lg px-3 py-2 text-sm font-medium transition-colors";
@@ -19,65 +45,20 @@ export default function StaffLayout({ title, subtitle, children }) {
       <aside className="lg:col-span-3 xl:col-span-2">
         <div className="card p-4 lg:sticky lg:top-24">
           <nav className="space-y-1">
-            <NavLink
-              to="/staff"
-              end
-              className={({ isActive }) =>
-                `${baseLinkClass} ${
-                  isActive ? "bg-primary text-white" : "hover:bg-gray-100"
-                }`
-              }
-            >
-              DASH BOARD
-            </NavLink>
-            {canUsers && (
+            {navItems.map((item) => (
               <NavLink
-                to="/admin/users"
+                key={item.to}
+                to={item.to}
+                end={item.end}
                 className={({ isActive }) =>
                   `${baseLinkClass} ${
                     isActive ? "bg-primary text-white" : "hover:bg-gray-100"
                   }`
                 }
               >
-                Người Dùng
+                {item.label}
               </NavLink>
-            )}
-            {canProducts && (
-              <NavLink
-                to="/staff/products"
-                className={({ isActive }) =>
-                  `${baseLinkClass} ${
-                    isActive ? "bg-primary text-white" : "hover:bg-gray-100"
-                  }`
-                }
-              >
-                Sản Phẩm & Tồn Kho
-              </NavLink>
-            )}
-            {canOrders && (
-              <NavLink
-                to="/staff/orders"
-                className={({ isActive }) =>
-                  `${baseLinkClass} ${
-                    isActive ? "bg-primary text-white" : "hover:bg-gray-100"
-                  }`
-                }
-              >
-                Đơn Hàng
-              </NavLink>
-            )}
-            {canSupport && (
-              <NavLink
-                to="/staff/support"
-                className={({ isActive }) =>
-                  `${baseLinkClass} ${
-                    isActive ? "bg-primary text-white" : "hover:bg-gray-100"
-                  }`
-                }
-              >
-                Chat Hỗ Trợ
-              </NavLink>
-            )}
+            ))}
           </nav>
         </div>
       </aside>
