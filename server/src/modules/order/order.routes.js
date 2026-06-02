@@ -17,7 +17,7 @@ router.patch(
 );
 router.patch(
   "/:id/return",
-  requireRole(ROLES.ADMIN, ROLES.EMPLOYEE),
+  requireRole(ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.EMPLOYEE),
   orderController.handleReturnRequestByEmployee,
 );
 router.get(

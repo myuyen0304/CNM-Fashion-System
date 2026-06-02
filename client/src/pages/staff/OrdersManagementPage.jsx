@@ -44,7 +44,10 @@ export default function OrdersManagementPage() {
 
   const canViewRevenue =
     user?.role === "admin" || user?.role === "supervisor";
-  const canHandleReturn = user?.role === "admin" || user?.role === "employee";
+  const canHandleReturn =
+    user?.role === "admin" ||
+    user?.role === "supervisor" ||
+    user?.role === "employee";
 
   const loadOrders = async (targetPage = page) => {
     try {

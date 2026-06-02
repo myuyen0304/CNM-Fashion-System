@@ -112,10 +112,19 @@ function BarChart({
   getValue,
   getTitle,
   getLabel,
+  renderTooltip,
   barColor,
 }) {
+  const [activeBucket, setActiveBucket] = useState("");
+  const activeRow = rows.find((row) => row.bucket === activeBucket) || null;
+
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
+      {activeRow && (
+        <div className="pointer-events-none absolute right-4 top-4 z-10 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg">
+          {renderTooltip ? renderTooltip(activeRow) : null}
+        </div>
+      )}
       <div className="min-w-[680px]">
         <div>
           <div
@@ -144,12 +153,14 @@ function BarChart({
                       {getLabel(row)}
                     </div>
                     <div
-                      className="w-full max-w-11 rounded-t-md shadow-md transition"
+                      className="w-full max-w-11 cursor-pointer rounded-t-md shadow-md transition hover:opacity-90"
                       style={{
                         height: `${barHeight}px`,
                         backgroundColor: barColor,
                       }}
                       title={getTitle(row)}
+                      onMouseEnter={() => setActiveBucket(row.bucket)}
+                      onMouseLeave={() => setActiveBucket("")}
                     />
                   </div>
                 );
@@ -383,6 +394,22 @@ export default function StaffDashboardPage() {
                       )} / ${row.orderCount} đơn`
                     }
                     getLabel={(row) => formatCompactCurrency(row.totalRevenue)}
+                    renderTooltip={(row) => (
+                      <div>
+                        <div className="text-xs font-semibold uppercase text-gray-400">
+                          Doanh thu
+                        </div>
+                        <div className="mt-1 font-bold text-gray-900">
+                          {formatBucket(row.bucket, revenuePeriod)}
+                        </div>
+                        <div className="mt-2 text-sm text-gray-700">
+                          Tổng doanh thu: <b>{formatCurrency(row.totalRevenue)}</b>
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Số đơn: <b>{formatNumber(row.orderCount)}</b>
+                        </div>
+                      </div>
+                    )}
                     barColor="#22c55e"
                   />
 
@@ -469,6 +496,22 @@ export default function StaffDashboardPage() {
                       )} sản phẩm / ${formatCurrency(row.totalRevenue)}`
                     }
                     getLabel={(row) => formatNumber(row.totalSold)}
+                    renderTooltip={(row) => (
+                      <div>
+                        <div className="text-xs font-semibold uppercase text-gray-400">
+                          Sản phẩm đã bán
+                        </div>
+                        <div className="mt-1 font-bold text-gray-900">
+                          {formatBucket(row.bucket, productPeriod)}
+                        </div>
+                        <div className="mt-2 text-sm text-gray-700">
+                          Đã bán: <b>{formatNumber(row.totalSold)}</b>
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Doanh thu: <b>{formatCurrency(row.totalRevenue)}</b>
+                        </div>
+                      </div>
+                    )}
                     barColor="#0ea5e9"
                   />
 

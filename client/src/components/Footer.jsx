@@ -1,4 +1,6 @@
-﻿export default function Footer() {
+import { Link } from "react-router-dom";
+
+export default function Footer() {
   return (
     <footer className="bg-slate-900 text-slate-100 mt-20 py-12">
       <div className="max-w-7xl mx-auto px-4">
@@ -14,19 +16,19 @@
             <h3 className="text-white font-semibold text-xl mb-4">Chính sách</h3>
             <ul className="text-slate-300 space-y-2 text-base">
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/chinh-sach" className="hover:text-white transition-colors">
                   Chính sách bảo mật
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/chinh-sach" className="hover:text-white transition-colors">
                   Điều khoản sử dụng
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/shop" className="hover:text-white transition-colors">
                   Hướng dẫn mua sắm
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -35,19 +37,19 @@
             <h3 className="text-white font-semibold text-xl mb-4">Hỗ trợ</h3>
             <ul className="text-slate-300 space-y-2 text-base">
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/cham-soc-khach-hang" className="hover:text-white transition-colors">
                   Liên hệ chúng tôi
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/cham-soc-khach-hang" className="hover:text-white transition-colors">
                   Câu hỏi thường gặp
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/cham-soc-khach-hang" className="hover:text-white transition-colors">
                   Hỗ trợ khách hàng
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
