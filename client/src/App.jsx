@@ -18,9 +18,11 @@ import VerifyEmailPage from "./pages/auth/VerifyEmailPage";
 import HomePage from "./pages/product/HomePage";
 import ShopPage from "./pages/product/ShopPage";
 import FashionNewsPage from "./pages/product/FashionNewsPage";
+import PromotionPage from "./pages/product/PromotionPage";
 import SearchPage from "./pages/product/SearchPage";
 import ProductDetailPage from "./pages/product/ProductDetailPage";
 import AboutUsPage from "./pages/help/AboutUsPage";
+import CustomerSupportPage from "./pages/help/CustomerSupportPage";
 import CareersPage from "./pages/help/CareersPage";
 import PolicyPage from "./pages/help/PolicyPage";
 import CartPage from "./pages/cart/CartPage";
@@ -77,7 +79,7 @@ function App() {
                 <Route path="/Tin-tuc" element={<FashionNewsPage />} />
                 <Route
                   path="/khuyen-mai"
-                  element={<Navigate to="/search?q=khuyến%20mãi" replace />}
+                  element={<PromotionPage />}
                 />
                 <Route
                   path="/Khuyen-mai"
@@ -88,7 +90,7 @@ function App() {
                 <Route path="/ve-chung-toi" element={<AboutUsPage />} />
                 <Route
                   path="/cham-soc-khach-hang"
-                  element={<Navigate to="/chat" replace />}
+                  element={<CustomerSupportPage />}
                 />
                 <Route path="/tuyen-dung-viec-lam" element={<CareersPage />} />
                 <Route path="/chinh-sach" element={<PolicyPage />} />
